@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORE HAUNT — Pitch Deck | Raaru</title>
+<meta name="description" content="ORE HAUNT: miner intelligence for the ORE protocol on Solana, built native for Solana Seeker and the Solana dApp Store. Pitch deck by Raaru.">
+<style>
+  :root{--bg:#06060e;--panel:#0e0e1d;--panel2:#121228;--line:#2e2e55;--txt:#ececf8;--dim:#a3a3c8;--gold:#ffb000;--cyan:#6ee7ff;--green:#7ef0c1}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,Roboto,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.55}
+  a{color:var(--gold)} main{max-width:980px;margin:0 auto;padding:0 22px 64px}
+  .hero{padding:56px 0 28px;border-bottom:1px solid var(--line)}
+  .eyebrow{letter-spacing:3px;font-size:12px;color:var(--cyan);text-transform:uppercase;margin:0 0 14px;font-weight:700}
+  h1{font-size:56px;line-height:.95;letter-spacing:2px;margin:0;font-weight:900} h1 span{color:var(--gold)}
+  .tagline{font-size:22px;line-height:1.35;margin:18px 0 10px;max-width:720px}
+  .sub{color:var(--dim);max-width:720px;margin:0}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 0}.pill{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 12px;font-size:13px;color:var(--dim)} .pill b{color:var(--txt)}
+  h2{font-size:13px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;margin:42px 0 14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px} @media(max-width:700px){.grid{grid-template-columns:1fr} h1{font-size:42px}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .card h3{margin:0 0 8px;font-size:19px} .card p,.card li{color:var(--dim)} .card ul{margin:8px 0 0;padding-left:18px} .card li{margin:6px 0}
+  .big{background:linear-gradient(135deg,#121228,#0e0e1d 55%,#1a1405);border:1px solid #4a3d12;border-radius:18px;padding:26px}
+  .ask{font-size:38px;font-weight:900;color:var(--gold);line-height:1;margin:6px 0}
+  .price{display:flex;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding:12px 0}.price:first-of-type{border-top:0}.price b{white-space:nowrap}
+  .price span{color:var(--dim);text-align:right}
+  .funds{display:grid;grid-template-columns:1fr 1fr;gap:16px} @media(max-width:700px){.funds{grid-template-columns:1fr}}
+  .fund{border-left:3px solid var(--gold);padding:4px 0 4px 16px}.fund h3{margin:0 0 6px}.fund p{color:var(--dim);margin:0}
+  .fund.hardware{border-left-color:var(--cyan)}
+  footer{color:var(--dim);font-size:13px;margin-top:48px;border-top:1px solid var(--line);padding-top:18px}
+  .cta{display:inline-block;margin-top:16px;background:var(--gold);color:#111;font-weight:800;text-decoration:none;padding:11px 16px;border-radius:999px}
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <p class="eyebrow">Raaru · Solana Seeker · Solana dApp Store</p>
+    <h1>ORE <span>HAUNT</span></h1>
+    <p class="tagline">Miner intelligence for the ORE protocol on Solana — dossiers, replays, leaderboards, and anomaly radar, built for the Seeker.</p>
+    <p class="sub">ORE is competitive, on-chain, and hard to read in real time. HAUNT turns raw mining rounds into intelligence a player can act on at a glance.</p>
+    <div class="pills">
+      <span class="pill"><b>Product</b> · ORE miner intelligence</span>
+      <span class="pill"><b>Platform</b> · Solana Seeker / dApp Store</span>
+      <span class="pill"><b>Status</b> · v0.1.12 sealed, in resubmission pipeline</span>
+      <span class="pill"><b>Ask</b> · $10,000–$20,000</span>
+    </div>
+  </section>
+
+  <h2>The Problem</h2>
+  <div class="card">
+    <p style="margin-top:0">ORE miners compete round after round, but the information that decides outcomes — who is winning, how exposure is concentrated, what changed, and what looks anomalous — is scattered across raw on-chain activity.</p>
+    <p style="margin-bottom:0">Without a dedicated intelligence layer, players are mining blind while better-informed wallets compound their edge.</p>
+  </div>
+
+  <h2>The Product</h2>
+  <div class="grid">
+    <div class="card"><h3>🧭 Miner Dossiers</h3><p>Profiles on leading mining wallets — history, patterns, and exposure in one readable view.</p></div>
+    <div class="card"><h3>▶️ Round Replays</h3><p>Cinematic replays of ORE rounds, so players can study how a round actually unfolded.</p></div>
+    <div class="card"><h3>🏆 Leaderboards</h3><p>A top-150 leaderboard with the context behind the ranking — not just names and numbers.</p></div>
+    <div class="card"><h3>📡 Anomaly Radar</h3><p>ANOMALY radar over ORE mining rounds, surfacing unusual activity worth a second look.</p></div>
+  </div>
+
+  <h2>How It Works</h2>
+  <div class="card">
+    <ul>
+      <li><b>Weekly, byte-frozen data drops.</b> Each release is a fixed snapshot — so “this week’s drop” honestly means this week’s data, identical for every user.</li>
+      <li><b>Real coverage.</b> Snapshot coverage includes rounds 455079–456632 and grows drop by drop; the current leaderboard covers 150 leaders.</li>
+      <li><b>Self-contained on device.</b> Content ships inside the app. Payments in SOL / USDC on Solana are verified on-device — the only network call a sale requires is verifying its own settlement.</li>
+    </ul>
+  </div>
+
+  <h2>Business Model — Premium, No Free Tier</h2>
+  <div class="card">
+    <div class="price"><b>$1 / 24 hours</b><span>Day pass — .skr introductory price, one-time</span></div>
+    <div class="price"><b>$7 / week</b><span>Weekly unlimited pass</span></div>
+    <div class="price"><b>$12 / day</b><span>ANOMALY radar — capped at 25 slots per rolling 24h</span></div>
+    <div class="price"><b>$100</b><span>Founder Lifetime</span></div>
+    <p style="margin-bottom:0">Pricing is a sieve for true fans: serious ORE players pay for an edge; casual traffic is not the business.</p>
+  </div>
+
+  <h2>Status</h2>
+  <div class="grid">
+    <div class="card"><h3>Built &amp; sealed</h3><ul><li>v0.1.12 signed release APK sealed (commit c57158c)</li><li>In the Solana dApp Store resubmission pipeline</li><li>Weekly-drop pipeline operational</li></ul></div>
+    <div class="card"><h3>Part of a Seeker catalog</h3><ul><li><b>Paper Moon</b> — on-chain paper-trading time-travel game</li><li><b>VOIDRUNNER</b> — bullet-hell survival</li><li>One publisher, one quality gate, multiple titles</li></ul></div>
+  </div>
+  <p style="color:var(--dim);font-size:14px">Traction is stated as build and pipeline status — the catalog is pre-revenue and pre-public-launch for HAUNT, and this deck invents no user or revenue numbers.</p>
+
+  <h2>The Ask</h2>
+  <div class="big">
+    <p style="margin:0;color:var(--dim);letter-spacing:2px;font-size:12px;text-transform:uppercase">Solana Mobile Grant Request</p>
+    <p class="ask">$10,000 – $20,000</p>
+    <p style="color:var(--dim);max-width:760px">To fund the data lane behind the radar, keep the weekly drops shipping, put HAUNT through launch — and put real Seeker hardware in the test loop for the whole catalog.</p>
+  </div>
+
+  <h2>Use of Funds</h2>
+  <div class="funds">
+    <div class="fund"><h3>1 · Data infrastructure</h3><p>Paid RPC and compute for the anomaly radar’s data lane — the recurring cost behind reliable, current ORE intelligence, replacing free-tier limits that degrade under load.</p></div>
+    <div class="fund"><h3>2 · Weekly-drop pipeline</h3><p>Continued development of the snapshot, packaging, and release pipeline that produces each week’s byte-frozen drop.</p></div>
+    <div class="fund"><h3>3 · Launch &amp; growth</h3><p>dApp Store launch and growth for HAUNT and the wider Seeker catalog from the same publisher.</p></div>
+    <div class="fund hardware"><h3>4 · Two Solana Seeker phones — hardware</h3><p><b>Requested in-kind, or within the grant range above.</b> Raaru currently has <b>no Seeker device</b>: development and QA run through CI builds, emulator evidence, and a non-Seeker Android phone. Two Seekers close the estate’s runtime-proving gap — cold-run gates, wallet-flow testing, and two-device testing on the actual target hardware — directly increasing build-out speed and submission quality across the catalog, HAUNT first.</p></div>
+  </div>
+
+  <h2>Team &amp; Contact</h2>
+  <div class="card">
+    <h3>Jacob Vargas — solo builder, publisher “Raaru”</h3>
+    <p>Designs, builds, verifies, and ships the catalog end-to-end: native Android shells, on-device payment verification, data pipelines, and dApp Store submissions.</p>
+    <p style="margin-bottom:0">
+      <a href="mailto:raaruofficial@gmail.com">raaruofficial@gmail.com</a> ·
+      <a href="https://x.com/raaruofficial">@raaruofficial on X</a> ·
+      <a href="https://raaruofficial.github.io/orehaunt-site/">ORE HAUNT app site</a> ·
+      <a href="https://raaruofficial.github.io/">Publisher hub</a>
+    </p>
+    <a class="cta" href="https://raaruofficial.github.io/orehaunt-site/">Visit the app site →</a>
+  </div>
+
+  <footer>© 2026 Raaru. All rights reserved. · ORE HAUNT pitch deck — prepared for the Solana Mobile Grant Request, October 2026.</footer>
+</main>
+</body>
+</html>
