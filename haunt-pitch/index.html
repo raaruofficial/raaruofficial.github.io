@@ -28,6 +28,14 @@
   .funds{display:grid;grid-template-columns:1fr 1fr;gap:18px} @media(max-width:700px){.funds{grid-template-columns:1fr}}
   .fund{border-left:3px solid var(--gold);padding:4px 0 4px 16px}.fund h3{margin:0 0 6px}.fund p{color:var(--dim);margin:0}.fund.hardware{border-left-color:var(--cyan)}
   .cta{display:inline-block;margin-top:18px;background:var(--gold);color:#111;font-weight:800;text-decoration:none;padding:12px 18px;border-radius:999px}
+  .brandrow{display:flex;align-items:center;gap:18px}
+  .appicon{width:64px;height:64px;border-radius:16px;flex:none}
+  .gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
+  .gallery figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px}
+  .gallery img{width:100%;height:auto;display:block;border-radius:10px}
+  .gallery figcaption{color:var(--dim);font-size:13px;line-height:1.45;margin-top:10px}
+  .gallery figcaption b{color:var(--txt);display:block;font-size:14px;margin-bottom:2px}
+  @media(max-width:700px){.gallery{grid-template-columns:1fr 1fr}.appicon{width:48px;height:48px;border-radius:12px}}
   footer{color:var(--dim);font-size:13px;margin-top:52px;border-top:1px solid var(--line);padding-top:18px}
 </style>
 </head>
@@ -35,7 +43,7 @@
 <main>
   <section class="hero">
     <p class="eyebrow">Raaru · Solana Seeker · Solana dApp Store</p>
-    <h1>ORE <span>HAUNT</span></h1>
+    <div class="brandrow"><img class="appicon" src="icon.png" alt="ORE HAUNT app icon — a gold ghost on black" width="144" height="144"><h1>ORE <span>HAUNT</span></h1></div>
     <p class="tagline">ORE miners are competing in the dark. <b>HAUNT turns the lights on.</b></p>
     <p class="sub">The intelligence layer for the ORE protocol on Solana — miner dossiers, round replays, leaderboards, and anomaly radar, built native for the Seeker. The data is on-chain and public. Until HAUNT, nobody made it usable in the moment — and nobody else has built it for the Seeker.</p>
     <div class="stats">
@@ -55,6 +63,12 @@
     <div class="card"><h3>▶️ Round Replays</h3><p>Watch any round unfold and study exactly how it was won — preparation no block explorer gives you.</p></div>
     <div class="card"><h3>🏆 Leaderboards</h3><p>The top 150 miners, ranked — with the context behind the ranking, not just a name and a number.</p></div>
     <div class="card"><h3>📡 Anomaly Radar</h3><p>ANOMALY watches ORE rounds for the unusual — the signal everyone else finds out about too late.</p></div>
+  </div>
+  <div class="gallery">
+    <figure><img src="heatmap-live.jpg" alt="ORE HAUNT tile heat map for ORE round 456511 — a 5 by 5 tile grid shaded by deployed SOL, with winner tile 10 ringed in gold (still from the live-rounds video)" loading="lazy"><figcaption><b>Tile heat map — live rounds</b>Every tile shaded by the SOL on it; the winner ringed in gold. Still from the live-rounds video.</figcaption></figure>
+    <figure><img src="shot-replay-board.jpg" alt="ORE HAUNT round replay screen — the 5 by 5 tile board with per-tile SOL values and round telemetry for round 438059" loading="lazy"><figcaption><b>Round replay — the tile board</b>Any round rebuilt deploy-by-deploy, with its telemetry.</figcaption></figure>
+    <figure><img src="shot-dossier.jpg" alt="ORE HAUNT miner dossier — the Scout's take on the top-ranked miner, with anomaly exposure across covered rounds" loading="lazy"><figcaption><b>Miner dossiers</b>The Scout's take: patterns, style, and anomaly exposure for the top wallets.</figcaption></figure>
+    <figure><img src="shot-leaderboard.jpg" alt="ORE HAUNT miner leaderboard — the top 150 wallets ranked by SOL deployed" loading="lazy"><figcaption><b>Leaderboard</b>The top 150 miners ranked by SOL deployed — tap through to any dossier.</figcaption></figure>
   </div>
 
   <h2>How It Works</h2>
