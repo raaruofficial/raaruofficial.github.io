@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAS PUMPA — Fleet SOL Top-Up</title>
+<meta name="description" content="GAS PUMPA tops up your fleet's wallets with SOL: set a target balance per wallet, and GAS PUMPA refills the ones running dry — you sign every pump. No token, no custody — GAS PUMPA never holds your funds.">
+<style>
+  :root{--bg:#06060e;--panel:#0e0e1d;--line:#34345e;--txt:#e9e9f8;--dim:#9b9bc6;--gold:#ffb000;--teal:#2dd4bf}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Roboto,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.6}
+  main{max-width:760px;margin:0 auto;padding:48px 24px 64px}
+  h1{font-size:34px;margin:12px 0 2px;font-weight:900}
+  .tag{color:var(--gold);letter-spacing:2px;font-size:14px;margin:0 0 8px}
+  .sub{color:var(--dim);margin:0 0 28px}
+  h2{font-size:15px;letter-spacing:3px;color:var(--dim);margin:36px 0 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:0 0 16px}
+  .card h3{margin:0 0 6px;font-size:19px}
+  .card p{margin:0 0 10px;color:var(--dim)}
+  .warn{border-color:#8a6d2f}
+  a{color:var(--gold)}
+  .mono{font-family:ui-monospace,Menlo,monospace;font-size:.85em;word-break:break-all}
+  footer{color:var(--dim);font-size:13px;margin-top:44px;border-top:1px solid var(--line);padding-top:18px}
+  img.logo{width:112px;height:112px;border-radius:24px}
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="icon.png" alt="GAS PUMPA logo — a neon pump sign">
+  <h1>GAS PUMPA</h1>
+  <p class="tag">FLEET SOL TOP-UP</p>
+  <p class="sub">GAS PUMPA tops up your fleet's wallets with SOL: set a target balance per wallet, and GAS PUMPA refills the ones running dry — you sign every pump. No token, no custody — GAS PUMPA never holds your funds.</p>
+
+  <div class="card">
+    <h3>What it does</h3>
+    <p>Whales, farmers, and bot operators run fleets of wallets — and lose money when a
+    wallet runs dry mid-operation: failed transactions, missed mints and claims.
+    GAS PUMPA keeps the whole fleet gassed from one tank wallet you control.</p>
+    <p><strong>Target-level pumping.</strong> Set a target (say 0.05 SOL per wallet).
+    A pump tops up only the wallets below target, by exactly the difference — never more,
+    never less. Fleet health reads at a glance: green, low, dead.</p>
+    <p><strong>Standing Pump.</strong> Rules you sign — on a schedule, or whenever a wallet
+    drops below your floor — check on your device and raise a one-tap prompt showing
+    exactly which wallets, how much each, the fee, and the tank balance after. You tap,
+    you sign. Nothing is ever auto-signed.</p>
+    <p><strong>Built-in ATM.</strong> Swap SOL, USDC, and SKR through Jupiter inside the
+    app, so the tank refills without leaving. You sign every swap; GAS PUMPA never
+    holds funds and is not a fiat on-ramp.</p>
+    <p><strong>Verified before it moves.</strong> Your fleet setup is a signed, fingerprinted
+    configuration. Every pump is built from it, checked instruction-by-instruction against
+    it, and simulated with an exact balance check before your wallet ever sees it.</p>
+  </div>
+
+  <div class="card warn">
+    <h3>Read this first — pumps are public</h3>
+    <p>A pump is public. When GAS PUMPA tops up your fleet, the chain permanently shows
+    the tank, every wallet it funded, and every amount — anyone who knows one of those
+    addresses can join the whole fleet together, forever. GAS PUMPA has no privacy mode
+    and makes no privacy claim. If your wallets must stay unlinked, do not pump them
+    from one tank.</p>
+  </div>
+
+  <div class="card">
+    <h3>No token</h3>
+    <p>GAS PUMPA has no token. Tokens trading under similar names are not affiliated
+    with GAS PUMPA — including Pumpa (PUMPA), mint
+    <span class="mono">Essb69dD51J5SupaqiAkj2FjXQNLFtpjgbCmTcZBpump</span>, and
+    GasPump.fun (GAS), mint
+    <span class="mono">EEziWMEorAj9q6VQwtuV615WbNyZhqR2Em5n6vGNpump</span>.
+    Any future token using the GAS PUMPA name is not ours.</p>
+  </div>
+
+  <h2>SUPPORT</h2>
+  <div class="card">
+    <p>GAS PUMPA is published by Raaru (on-chain: <strong>raaru.skr</strong>).
+    For support, open an issue on the project's GitHub:
+    <a href="https://github.com/raaruofficial/gaspumpa-app/issues">github.com/raaruofficial/gaspumpa-app/issues</a>.</p>
+    <p>Common answers: the app runs entirely on your device — if a balance looks stale,
+    pull Refresh on the fleet screen. A pump that stops mid-way is recorded as PARTIAL
+    in your pump history with the batches that did send; nothing retries silently.
+    Standing Pump prompts appear when you open the app, and about every 15 minutes in
+    the background when the watch is on.</p>
+  </div>
+
+  <h2>PRIVACY</h2>
+  <div class="card">
+    <p><strong>GAS PUMPA collects no data.</strong> There is no account, no analytics,
+    no server of ours, and nothing to sell or share. Your fleet setup, standing rules,
+    and pump history live only on your device and are excluded from cloud backup and
+    device transfer; uninstalling deletes them.</p>
+    <p>What leaves the device is what the chain itself requires: balance checks go to a
+    public Solana RPC, swaps go to Jupiter, and every pump you sign is a public Solana
+    transaction — permanently visible, as described above. Name lookups you type into
+    the fleet editor (a .sol or .skr name) are resolved once, at entry, through the
+    Solana Name Service resolver.</p>
+  </div>
+
+  <footer>
+    GAS PUMPA — Fleet SOL Top-Up · Publisher: Raaru ·
+    <a href="https://raaruofficial.github.io/">All Raaru apps</a>
+  </footer>
+</main>
+</body>
+</html>
