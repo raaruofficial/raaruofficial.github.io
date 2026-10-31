@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Seeker Citadel</title>
+<meta name="description" content="Privacy policy for Seeker Citadel, an independent community forum for Seeker owners published by Raaru.">
+<link rel="icon" type="image/webp" href="icon.webp">
+<style>
+  :root{--bg:#06060e;--panel:#0e0e1d;--line:#34345e;--txt:#e9e9f8;--dim:#9b9bc6;--gold:#ffb000}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Roboto,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.6}
+  main{max-width:760px;margin:0 auto;padding:48px 24px 64px}
+  h1{font-size:30px;margin:0 0 4px;font-weight:900}
+  .sub{color:var(--dim);margin:0 0 28px}
+  h2{font-size:19px;margin:32px 0 10px}
+  p,li{color:var(--dim)}
+  strong{color:var(--txt)}
+  a{color:var(--gold)}
+  footer{color:var(--dim);font-size:13px;margin-top:44px;border-top:1px solid var(--line);padding-top:18px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy Policy — Seeker Citadel</h1>
+  <p class="sub">Seeker Citadel is published by Raaru. This policy describes
+  what the Seeker Citadel service stores, what it never stores, and how long
+  it keeps what it stores. Last updated 2026-10-30.</p>
+
+  <p>An independent community forum for Seeker owners. Not endorsed by, affiliated with, or sponsored by Solana or Solana Mobile.</p>
+
+  <h2>1. Your wallet is your identity</h2>
+  <p>Seeker Citadel has no accounts, passwords, or email sign-up. When you
+  sign in, you sign a message with your Solana wallet (Sign-In with Solana).
+  Your <strong>wallet address is your forum name</strong>: posts, replies,
+  reports, and moderation actions are recorded against that address, and
+  everything you do in the forum is <strong>permanently linkable to your
+  on-chain finances</strong>. The app shows you this disclosure before you
+  sign in. Forum content is a public, permanent record — do not post anything
+  you would not want publicly attributed to your wallet.</p>
+
+  <h2>2. What the host stores</h2>
+  <ul>
+    <li><strong>Member record:</strong> your wallet address, the date your
+    Seeker Genesis Token eligibility was verified, reputation, moderation
+    standing (strikes, mutes, bans), and — if you claim one — your founding
+    number.</li>
+    <li><strong>Your content:</strong> threads, replies, poll votes, reports
+    you file, follows, and blocks.</li>
+    <li><strong>Sessions:</strong> when you sign in, the host issues a session
+    token. Only a <strong>SHA-256 hash</strong> of the token is stored; the
+    token itself is shown to your device once and never stored. Sessions
+    expire 7 days after issue and are not renewed silently.</li>
+    <li><strong>Eligibility proof (internal only):</strong> at sign-in the
+    host records the Seeker Genesis Token mint(s) your wallet held, as an
+    internal join key (for example, so one device token cannot claim two
+    founding spots). <strong>Mint addresses are never displayed in the app,
+    never shown on any public surface, and never returned by the service to
+    any user or role.</strong> Public surfaces show only eligibility state —
+    that a member is a verified holder — never a mint.</li>
+  </ul>
+
+  <h2>3. What the host never stores</h2>
+  <ul>
+    <li><strong>No IP addresses and no user-agent strings</strong> are stored
+    anywhere in the service, and no network identifier is ever joined to a
+    member, a wallet, or a session. Rate limiting is keyed on wallet
+    addresses and member records, not on network identifiers.</li>
+    <li>No private keys, seed phrases, or signing material — signing happens
+    in your wallet on your device; the host only verifies signatures.</li>
+    <li>No payment information. Seeker Citadel has no payments, no checkout,
+    and no held funds.</li>
+    <li>No advertising identifiers, analytics beacons, or cross-app tracking.
+    The app contains no web view.</li>
+  </ul>
+
+  <h2>4. The one external service: the RPC provider</h2>
+  <p>To verify Seeker Genesis Token eligibility at sign-in, the host must ask
+  the Solana blockchain what tokens your wallet holds. That query goes to our
+  RPC provider, <strong>Alchemy</strong> (a dedicated Seeker Citadel
+  application key), with the public Solana mainnet endpoint
+  (<strong>api.mainnet-beta.solana.com</strong>) as an automatic failover.
+  The query contains your wallet address — which is public on-chain
+  information — and nothing else about you. The host makes no wallet-keyed
+  chain reads outside sign-in (and, in any future paid version, payment
+  verification). What an RPC provider can see is limited to the queries
+  described here; we do not send them your posts, reports, or session data.</p>
+
+  <h2>5. Retention</h2>
+  <ul>
+    <li>Sign-in challenges (the one-time nonces behind sign-in) are deleted
+    within 24 hours of use or expiry.</li>
+    <li>Session records are deleted 7 days after the session expires.</li>
+    <li>Poll ballots are deleted 7 days after a poll closes; the tallies are
+    kept.</li>
+    <li>Forum content is the permanent record described in §1 and is kept
+    unless removed under the moderation rules in the Terms of Use; a removed
+    post's declared outbound link, if any, is deleted at removal or within
+    12 months, whichever comes first.</li>
+  </ul>
+
+  <h2>6. On your device</h2>
+  <p>The app keeps drafts and a cache of what you have read on your device so
+  the forum opens and reads offline. That data never leaves your device
+  except the posts you choose to publish. Uninstalling the app removes it.</p>
+
+  <h2>7. Children, changes, contact</h2>
+  <p>Seeker Citadel is for Seeker owners and is not directed at children under
+  13. If this policy changes materially, the new version will be posted here
+  with a new date before it takes effect. Questions about this policy:
+  <a href="mailto:raaruofficial+support@gmail.com">raaruofficial+support@gmail.com</a>.</p>
+
+  <footer>© 2026 Raaru. All rights reserved. · <a href="index.html">Seeker Citadel</a> · <a href="terms.html">Terms of Use</a></footer>
+</main>
+</body>
+</html>
