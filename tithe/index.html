@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TITHE — Self-Sweep Splitter</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         line-height: 1.5; background: #10151c; color: #e8edf3; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 8px 0 2px; }
+  h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+  .sub { color: #9fb0c3; margin: 0 0 16px; }
+  .card { background: #182030; border: 1px solid #2a3850; border-radius: 12px;
+          padding: 16px 18px; margin: 14px 0; }
+  .warn { border-color: #8a6d2f; background: #241e10; }
+  .err  { border-color: #a33b3b; background: #2a1214; }
+  .ok   { border-color: #2f7a4d; background: #0f2417; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #2a3850; vertical-align: top; }
+  th { color: #9fb0c3; font-weight: 600; font-size: .85rem; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; }
+  .meta { color: #9fb0c3; font-size: .92rem; }
+  label { display: block; margin: 12px 0 4px; font-weight: 600; }
+  input, select { width: 100%; padding: 9px 10px; border-radius: 8px;
+    border: 1px solid #2a3850; background: #0d1219; color: #e8edf3; font-size: 1rem; }
+  button { margin-top: 16px; padding: 10px 18px; border-radius: 8px; border: 0;
+    background: #2f9e6e; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  button.secondary { background: #33465f; }
+  button:disabled { background: #3a4350; color: #93a1b1; cursor: not-allowed; }
+  #status { white-space: pre-wrap; }
+  .hidden { display: none; }
+  footer { color: #9fb0c3; font-size: .9rem; margin-top: 32px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TITHE — Self-Sweep Splitter</h1>
+  <p class="sub">Pay a split rule: one payment, divided across the destinations below, in a single transaction.</p>
+
+  <div id="fatal" class="card err hidden" role="alert">
+    <strong>This split cannot be paid from this link.</strong>
+    <p id="fatalReason"></p>
+    <p>Nothing on this page can be signed or sent. If someone sent you this link,
+       ask them to send a fresh one.</p>
+  </div>
+
+  <!-- The wallet-map warning comes BEFORE the destination ("X-ray")
+       display it describes (BANKAI 2026-10-30, MIRROR-3-02): the
+       warning must precede the exposure, not follow it. -->
+  <section class="card warn">
+    <h2 style="margin-top:0">Read this before paying</h2>
+    <p>A split payment is one public transaction on Solana. It permanently shows every
+       destination address, every amount, and the percentage each destination receives.
+       Anyone who knows any one of those addresses can find the whole split and join it
+       up, forever. This page shortens the addresses it displays, but that hiding is only
+       on this page — it does not hide them on-chain.</p>
+    <p>Even the percentages on their own reveal a detailed picture of the owner's money,
+       so sharing this link is a deliberate act.</p>
+  </section>
+
+  <section id="configCard" class="card hidden">
+    <h2 style="margin-top:0">The split rule in this link</h2>
+    <p class="meta">
+      Split fingerprint <span class="mono" id="fingerprint"></span> ·
+      version <span id="cfgVersion"></span> ·
+      created <span id="cfgCreated"></span><br>
+      Rule owner <span class="mono" id="cfgOwner"></span> — the signature on this rule was
+      checked on this device, against this list, before anything below was shown.
+    </p>
+    <!-- BANKAI RECKONING (GHOST-01 sub-part): the fingerprint is
+         only an anchor if the payer compares it against a value
+         from a DIFFERENT channel than this link. Say so, here,
+         where the fingerprint is shown. -->
+    <p class="meta">Compare this fingerprint with the one the owner gave you through
+      another channel — a message, a call, in person. If it differs, do not pay.</p>
+    <table>
+      <thead><tr><th>Destination</th><th>Share</th><th>Address</th><th>Notes</th></tr></thead>
+      <tbody id="destRows"></tbody>
+    </table>
+    <p id="taxNote" class="meta hidden"></p>
+  </section>
+
+  <section id="payCard" class="card hidden">
+    <h2 style="margin-top:0">Make a payment</h2>
+    <label for="assetSel">What are you paying with?</label>
+    <select id="assetSel"></select>
+
+    <label for="amountIn">Amount (for example 0.25)</label>
+    <input id="amountIn" inputmode="decimal" autocomplete="off" placeholder="0.00">
+    <p class="meta" id="minNote"></p>
+
+    <label for="rpcIn">RPC endpoint (used to fetch a recent blockhash, check the mint,
+      and run the pre-signing simulation)</label>
+    <input id="rpcIn" autocomplete="off" value="https://api.mainnet-beta.solana.com">
+
+    <label for="priorityIn">Priority fee, in micro-lamports per compute unit (optional, at most 50000)</label>
+    <input id="priorityIn" inputmode="numeric" autocomplete="off" value="0">
+
+    <p class="meta" id="walletState">Wallet: not connected yet.</p>
+    <button id="connectBtn" class="secondary" type="button">Connect a wallet</button>
+    <button id="checkBtn" type="button" disabled>Check this payment</button>
+
+    <div id="checkOut" class="hidden">
+      <h2>What this payment will do</h2>
+      <table>
+        <thead><tr><th>Destination</th><th>Receives</th></tr></thead>
+        <tbody id="shareRows"></tbody>
+      </table>
+      <p class="meta" id="rentNote"></p>
+      <p class="meta">Checks run on this device, in this order: the transaction is built
+         from the verified rule above; it is then decoded and compared, entry by entry,
+         against that same rule; then it is simulated against the RPC endpoint and the
+         simulated balances are checked, account by account, against exactly what this
+         payment should move. If any
+         check fails, signing is not offered and the reason is shown here.</p>
+    </div>
+
+    <p id="status" class="meta"></p>
+    <button id="signBtn" type="button" disabled>Sign with wallet</button>
+    <p class="meta" id="sendOut"></p>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">About TITHE — Self-Sweep Splitter</h2>
+    <p>TITHE is a self-sweep splitter for Solana: set a percentage split across your own wallets, and every payment divides in one transaction. No token, no church, no custody — TITHE never holds your funds.</p>
+    <p><strong>TITHE has no token.</strong> The token using the mint
+       <span class="mono">BsdNL85AKVyK46sGekLbSysbA3rYBLuFifJwKbDXpump</span> is unrelated to TITHE.</p>
+    <p>How to read this tool: a split rule is friction, and a rule set in advance. The owner
+       keeps full control of every destination and can move funds back at any time.</p>
+    <p>Editing a split makes a new link. Links already shared keep paying the old split.</p>
+    <p>This page runs entirely on your device. The split rule travels inside the link
+       itself, after the <span class="mono">#</span>, so it is never sent to a server when
+       the page loads. The page holds no funds and takes no cut of any payment.</p>
+  </section>
+
+  <footer>TITHE — Self-Sweep Splitter · Static page · The rule in the link is the whole rule.</footer>
+</main>
+
+<script>
+/* TITHE — Self-Sweep Splitter: core logic for the static payer page.
+ *
+ * A faithful JavaScript port of the Python reference implementation in
+ * ../core/ (splitconfig.py, splitmath.py, solana_tx.py, builder.py,
+ * gate.py, ed25519_pure.py, base58.py), written against the frozen
+ * format in ../spec/SPLITCONFIG_V1.md and pinned byte-for-byte by
+ * ../spec/test-vectors.json (see test-core.mjs).
+ *
+ * No dependencies. The same code runs in the browser and in Node, so
+ * the tested code is the shipped code: SHA-256 / SHA-512 and Ed25519
+ * verification are implemented here in pure JS (BigInt), not delegated
+ * to a platform crypto API that could differ between test and page.
+ *
+ * Money math is integer-only (BigInt for amounts and shares). Amounts
+ * passed to the builder / math functions may be BigInt or safe-integer
+ * numbers; shares and amounts returned are BigInt.
+ */
+"use strict";
+
+const TitheCore = (() => {
+
+// ---------------------------------------------------------------- errors
+class ConfigError extends Error {}
+class BuildError extends Error {}
+class GateError extends Error {}
+class MintError extends Error {}
+
+// ---------------------------------------------------------------- bytes
+function concatBytes(...parts) {
+  let n = 0;
+  for (const p of parts) n += p.length;
+  const out = new Uint8Array(n);
+  let off = 0;
+  for (const p of parts) { out.set(p, off); off += p.length; }
+  return out;
+}
+function bytesEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+function bytesToHex(data) {
+  let s = "";
+  for (const b of data) s += b.toString(16).padStart(2, "0");
+  return s;
+}
+function hexToBytes(hex) {
+  if (typeof hex !== "string" || hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex))
+    throw new Error("invalid hex string");
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(2 * i, 2 * i + 2), 16);
+  return out;
+}
+function utf8Encode(s) { return new TextEncoder().encode(s); }
+function utf8DecodeStrict(bytes) {
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+function bytesToBigIntLE(data) {
+  let n = 0n;
+  for (let i = data.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(data[i]);
+  return n;
+}
+function bigIntToBytesLE(n, len) {
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) { out[i] = Number(n & 0xffn); n >>= 8n; }
+  return out;
+}
+function u32LE(n) {
+  const out = new Uint8Array(4);
+  new DataView(out.buffer).setUint32(0, n, true);
+  return out;
+}
+function u16LE(n) {
+  const out = new Uint8Array(2);
+  new DataView(out.buffer).setUint16(0, n, true);
+  return out;
+}
+function i64LE(n) {
+  const out = new Uint8Array(8);
+  new DataView(out.buffer).setBigInt64(0, BigInt(n), true);
+  return out;
+}
+function u64LE(n) { return bigIntToBytesLE(BigInt(n), 8); }
+function toBigAmount(x) {
+  if (typeof x === "bigint") return x;
+  if (typeof x === "number" && Number.isSafeInteger(x)) return BigInt(x);
+  throw new BuildError("amount must be an integer (BigInt or safe-integer number)");
+}
+
+// ---------------------------------------------------------------- base58
+const B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const B58_INDEX = new Map([...B58_ALPHABET].map((c, i) => [c, i]));
+
+function b58encode(data) {
+  if (data.length === 0) return "";
+  let zeros = 0;
+  while (zeros < data.length && data[zeros] === 0) zeros++;
+  let n = 0n;
+  for (const b of data) n = (n << 8n) | BigInt(b);
+  let out = "";
+  while (n > 0n) {
+    out = B58_ALPHABET[Number(n % 58n)] + out;
+    n /= 58n;
+  }
+  return "1".repeat(zeros) + out;
+}
+function b58decode(s) {
+  if (s === "") return new Uint8Array(0);
+  let n = 0n;
+  for (const c of s) {
+    if (!B58_INDEX.has(c)) throw new Error(`invalid base58 character: ${JSON.stringify(c)}`);
+    n = n * 58n + BigInt(B58_INDEX.get(c));
+  }
+  let zeros = 0;
+  while (zeros < s.length && s[zeros] === "1") zeros++;
+  let body = new Uint8Array(0);
+  if (n > 0n) {
+    let hex = n.toString(16);
+    if (hex.length % 2) hex = "0" + hex;
+    body = hexToBytes(hex);
+  }
+  return concatBytes(new Uint8Array(zeros), body);
+}
+function pubkeyFromBase58(s) {
+  const raw = b58decode(s);
+  if (raw.length !== 32) throw new Error(`pubkey must decode to 32 bytes, got ${raw.length}`);
+  return raw;
+}
+
+// ------------------------------------------------------------- base64(url)
+const B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const B64URL_INDEX = new Map();
+for (let i = 0; i < 64; i++) B64URL_INDEX.set(B64_ALPHABET[i], i);
+B64URL_INDEX.set("-", 62);
+B64URL_INDEX.set("_", 63);
+
+function base64Encode(data, urlSafe) {
+  let out = "";
+  for (let i = 0; i < data.length; i += 3) {
+    const a = data[i], b = i + 1 < data.length ? data[i + 1] : 0, c = i + 2 < data.length ? data[i + 2] : 0;
+    const n = (a << 16) | (b << 8) | c;
+    out += B64_ALPHABET[(n >> 18) & 63] + B64_ALPHABET[(n >> 12) & 63];
+    out += i + 1 < data.length ? B64_ALPHABET[(n >> 6) & 63] : "=";
+    out += i + 2 < data.length ? B64_ALPHABET[n & 63] : "=";
+  }
+  if (urlSafe) out = out.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return out;
+}
+function b64urlEncode(data) { return base64Encode(data, true); }
+function base64StdEncode(data) { return base64Encode(data, false); }
+function b64Decode(s, urlSafe) {
+  const clean = s.replace(/=+$/, "");
+  if (clean.length % 4 === 1) throw new Error("invalid base64 length");
+  const vals = [];
+  for (const ch of clean) {
+    if (urlSafe && B64URL_INDEX.has(ch)) vals.push(B64URL_INDEX.get(ch));
+    else if (!urlSafe && B64_ALPHABET.includes(ch)) vals.push(B64_ALPHABET.indexOf(ch));
+    else throw new Error(`invalid base64 character: ${JSON.stringify(ch)}`);
+  }
+  const out = [];
+  for (let i = 0; i < vals.length; i += 4) {
+    const rem = vals.length - i;
+    const n = (vals[i] << 18) | ((vals[i + 1] || 0) << 12) | ((vals[i + 2] || 0) << 6) | (vals[i + 3] || 0);
+    out.push((n >> 16) & 0xff);
+    if (rem > 2) out.push((n >> 8) & 0xff);
+    if (rem > 3) out.push(n & 0xff);
+  }
+  return new Uint8Array(out);
+}
+function b64urlDecode(s) { return b64Decode(s, true); }
+function b64urlNopad(data) { return b64urlEncode(data); }
+
+// ---------------------------------------------------------------- SHA-256
+const SHA256_K = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+];
+function sha256(data) {
+  const rotr = (x, n) => ((x >>> n) | (x << (32 - n))) >>> 0;
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const bitLen = data.length * 8;
+  const paddedLen = (((data.length + 9 + 63) >> 6) << 6);
+  const msg = new Uint8Array(paddedLen);
+  msg.set(data);
+  msg[data.length] = 0x80;
+  const dv = new DataView(msg.buffer);
+  dv.setUint32(paddedLen - 4, bitLen >>> 0, false);
+  dv.setUint32(paddedLen - 8, Math.floor(bitLen / 4294967296), false);
+  const w = new Uint32Array(64);
+  for (let off = 0; off < paddedLen; off += 64) {
+    for (let t = 0; t < 16; t++) w[t] = dv.getUint32(off + 4 * t, false);
+    for (let t = 16; t < 64; t++) {
+      const s0 = (rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3)) >>> 0;
+      const s1 = (rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10)) >>> 0;
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 64; t++) {
+      const S1 = (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) >>> 0;
+      const ch = ((e & f) ^ (~e & g)) >>> 0;
+      const t1 = (h + S1 + ch + SHA256_K[t] + w[t]) >>> 0;
+      const S0 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) >>> 0;
+      const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+      const t2 = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+    H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+  }
+  const out = new Uint8Array(32);
+  const odv = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) odv.setUint32(4 * i, H[i], false);
+  return out;
+}
+function sha256Hex(data) { return bytesToHex(sha256(data)); }
+
+// ---------------------------------------------------------------- SHA-512
+// Needed by Ed25519 verification (the hint hash), exactly as
+// hashlib.sha512 is used by the Python reference. 64-bit words ride on
+// BigInt; output is identical to the platform digest.
+const M64 = (1n << 64n) - 1n;
+const SHA512_K = [
+  "428a2f98d728ae22", "7137449123ef65cd", "b5c0fbcfec4d3b2f", "e9b5dba58189dbbc",
+  "3956c25bf348b538", "59f111f1b605d019", "923f82a4af194f9b", "ab1c5ed5da6d8118",
+  "d807aa98a3030242", "12835b0145706fbe", "243185be4ee4b28c", "550c7dc3d5ffb4e2",
+  "72be5d74f27b896f", "80deb1fe3b1696b1", "9bdc06a725c71235", "c19bf174cf692694",
+  "e49b69c19ef14ad2", "efbe4786384f25e3", "0fc19dc68b8cd5b5", "240ca1cc77ac9c65",
+  "2de92c6f592b0275", "4a7484aa6ea6e483", "5cb0a9dcbd41fbd4", "76f988da831153b5",
+  "983e5152ee66dfab", "a831c66d2db43210", "b00327c898fb213f", "bf597fc7beef0ee4",
+  "c6e00bf33da88fc2", "d5a79147930aa725", "06ca6351e003826f", "142929670a0e6e70",
+  "27b70a8546d22ffc", "2e1b21385c26c926", "4d2c6dfc5ac42aed", "53380d139d95b3df",
+  "650a73548baf63de", "766a0abb3c77b2a8", "81c2c92e47edaee6", "92722c851482353b",
+  "a2bfe8a14cf10364", "a81a664bbc423001", "c24b8b70d0f89791", "c76c51a30654be30",
+  "d192e819d6ef5218", "d69906245565a910", "f40e35855771202a", "106aa07032bbd1b8",
+  "19a4c116b8d2d0c8", "1e376c085141ab53", "2748774cdf8eeb99", "34b0bcb5e19b48a8",
+  "391c0cb3c5c95a63", "4ed8aa4ae3418acb", "5b9cca4f7763e373", "682e6ff3d6b2b8a3",
+  "748f82ee5defb2fc", "78a5636f43172f60", "84c87814a1f0ab72", "8cc702081a6439ec",
+  "90befffa23631e28", "a4506cebde82bde9", "bef9a3f7b2c67915", "c67178f2e372532b",
+  "ca273eceea26619c", "d186b8c721c0c207", "eada7dd6cde0eb1e", "f57d4f7fee6ed178",
+  "06f067aa72176fba", "0a637dc5a2c898a6", "113f9804bef90dae", "1b710b35131c471b",
+  "28db77f523047d84", "32caab7b40c72493", "3c9ebe0a15c9bebc", "431d67c49c100d4c",
+  "4cc5d4becb3e42b6", "597f299cfc657e2a", "5fcb6fab3ad6faec", "6c44198c4a475817",
+].map((h) => BigInt("0x" + h));
+function sha512(data) {
+  const rotr = (x, n) => ((x >> BigInt(n)) | (x << BigInt(64 - n))) & M64;
+  const H = [
+    "6a09e667f3bcc908", "bb67ae8584caa73b", "3c6ef372fe94f82b", "a54ff53a5f1d36f1",
+    "510e527fade682d1", "9b05688c2b3e6c1f", "1f83d9abfb41bd6b", "5be0cd19137e2179",
+  ].map((h) => BigInt("0x" + h));
+  const bitLen = BigInt(data.length) * 8n;
+  const paddedLen = (((data.length + 17 + 127) >> 7) << 7);
+  const msg = new Uint8Array(paddedLen);
+  msg.set(data);
+  msg[data.length] = 0x80;
+  for (let i = 0; i < 16; i++)
+    msg[paddedLen - 1 - i] = Number((bitLen >> BigInt(8 * i)) & 0xffn);
+  const w = new Array(80).fill(0n);
+  for (let off = 0; off < paddedLen; off += 128) {
+    for (let t = 0; t < 16; t++) {
+      let v = 0n;
+      for (let j = 0; j < 8; j++) v = (v << 8n) | BigInt(msg[off + 8 * t + j]);
+      w[t] = v;
+    }
+    for (let t = 16; t < 80; t++) {
+      const s0 = rotr(w[t - 15], 1) ^ rotr(w[t - 15], 8) ^ (w[t - 15] >> 7n);
+      const s1 = rotr(w[t - 2], 19) ^ rotr(w[t - 2], 61) ^ (w[t - 2] >> 6n);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & M64;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 80; t++) {
+      const S1 = rotr(e, 14) ^ rotr(e, 18) ^ rotr(e, 41);
+      const ch = (e & f) ^ ((~e & M64) & g);
+      const t1 = (h + S1 + ch + SHA512_K[t] + w[t]) & M64;
+      const S0 = rotr(a, 28) ^ rotr(a, 34) ^ rotr(a, 39);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) & M64;
+      h = g; g = f; f = e; e = (d + t1) & M64;
+      d = c; c = b; b = a; a = (t1 + t2) & M64;
+    }
+    const v = [a, b, c, d, e, f, g, h];
+    for (let i = 0; i < 8; i++) H[i] = (H[i] + v[i]) & M64;
+  }
+  const out = new Uint8Array(64);
+  for (let i = 0; i < 8; i++)
+    for (let j = 0; j < 8; j++) out[8 * i + j] = Number((H[i] >> BigInt(56 - 8 * j)) & 0xffn);
+  return out;
+}
+
+// ------------------------------------------------- Ed25519 verify (only)
+// Port of ed25519_pure.py: extended coordinates, no per-add inversion.
+// Verification only — this page never signs a config and holds no seed.
+const ED_Q = (1n << 255n) - 19n;
+const ED_L = (1n << 252n) + 27742317777372353535851937790883648493n;
+function edMod(x) { const r = x % ED_Q; return r >= 0n ? r : r + ED_Q; }
+function edPow(base, exp) {
+  let result = 1n, b = edMod(base), e = exp;
+  while (e > 0n) {
+    if (e & 1n) result = result * b % ED_Q;
+    b = b * b % ED_Q;
+    e >>= 1n;
+  }
+  return result;
+}
+function edInv(x) { return edPow(x, ED_Q - 2n); }
+const ED_D = edMod(-121665n * edInv(121666n));
+const ED_I = edPow(2n, (ED_Q - 1n) / 4n); // sqrt(-1)
+
+// Extended coordinates: [X, Y, Z, T] with x = X/Z, y = Y/Z, xy = T/Z.
+function edPointAdd(P, Q) {
+  const A = edMod((P[1] - P[0]) * (Q[1] - Q[0]));
+  const B = edMod((P[1] + P[0]) * (Q[1] + Q[0]));
+  const C = edMod(2n * ED_D * P[3] * Q[3]);
+  const D = edMod(2n * P[2] * Q[2]);
+  const E = edMod(B - A), F = edMod(D - C), G = edMod(D + C), H = edMod(B + A);
+  return [edMod(E * F), edMod(G * H), edMod(F * G), edMod(E * H)];
+}
+function edPointMul(P, e) {
+  let Q = [0n, 1n, 1n, 0n]; // neutral element
+  let scalar = e;
+  while (scalar > 0n) {
+    if (scalar & 1n) Q = edPointAdd(Q, P);
+    P = edPointAdd(P, P);
+    scalar >>= 1n;
+  }
+  return Q;
+}
+function edEncodePoint(P) {
+  const zinv = edInv(P[2]);
+  const x = edMod(P[0] * zinv), y = edMod(P[1] * zinv);
+  const out = bigIntToBytesLE(y, 32);
+  if (x & 1n) out[31] |= 0x80;
+  return out;
+}
+function edDecodePoint(s) {
+  if (s.length !== 32) throw new Error("bad point length");
+  const y = bytesToBigIntLE(s) & ((1n << 255n) - 1n);
+  const sign = BigInt((s[31] >> 7) & 1);
+  if (y >= ED_Q) throw new Error("y out of range");
+  // x = sqrt((y^2 - 1) / (d y^2 + 1))
+  const xx = edMod((y * y - 1n) * edInv(edMod(ED_D * y * y + 1n)));
+  let x = edPow(xx, (ED_Q + 3n) / 8n);
+  if (edMod(x * x - xx) !== 0n) x = edMod(x * ED_I);
+  if (edMod(x * x - xx) !== 0n) throw new Error("point not on curve");
+  if ((x & 1n) !== sign) x = ED_Q - x;
+  return [x, y, 1n, edMod(x * y)];
+}
+const ED_B = (() => {
+  const By = edMod(4n * edInv(5n));
+  const xx = edMod((By * By - 1n) * edInv(edMod(ED_D * By * By + 1n)));
+  let Bx = edPow(xx, (ED_Q + 3n) / 8n);
+  if (edMod(Bx * Bx - xx) !== 0n) Bx = edMod(Bx * ED_I);
+  if (Bx & 1n) Bx = ED_Q - Bx;
+  return [Bx, By, 1n, edMod(Bx * By)];
+})();
+function edHint(m) { return bytesToBigIntLE(sha512(m)) % ED_L; }
+
+function ed25519Verify(sig, msg, pk) {
+  if (sig.length !== 64 || pk.length !== 32) return false;
+  let A, R;
+  try {
+    A = edDecodePoint(pk);
+    R = edDecodePoint(sig.slice(0, 32));
+  } catch { return false; }
+  const S = bytesToBigIntLE(sig.slice(32));
+  if (S >= ED_L) return false;
+  const h = edHint(concatBytes(sig.slice(0, 32), pk, msg));
+  return bytesEqual(
+    edEncodePoint(edPointMul(ED_B, S)),
+    edEncodePoint(edPointAdd(R, edPointMul(A, h))));
+}
+function isOnCurve(pubkey32) {
+  // Used by PDA derivation: true if the bytes decode to a curve point.
+  try { edDecodePoint(pubkey32); return true; } catch { return false; }
+}
+
+// ------------------------------------------------------ program constants
+const SYSTEM_PROGRAM = b58decode("11111111111111111111111111111111");
+const TOKEN_PROGRAM = b58decode("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const TOKEN2022_PROGRAM = b58decode("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+const ATA_PROGRAM = b58decode("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+const COMPUTE_BUDGET_PROGRAM = b58decode("ComputeBudget111111111111111111111111111111");
+const MEMO_PROGRAM = b58decode("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+const USDC_MINT = b58decode("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const SKR_MINT = b58decode("SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3");
+const MAX_TX_SIZE = 1232;
+const ATA_RENT_LAMPORTS_CLASSIC = 2039280;
+const PROGRAM_IDS_HEX = new Set([
+  SYSTEM_PROGRAM, TOKEN_PROGRAM, TOKEN2022_PROGRAM, ATA_PROGRAM,
+  COMPUTE_BUDGET_PROGRAM, MEMO_PROGRAM,
+].map(bytesToHex));
+
+// ------------------------------------------------------------ SplitConfig
+const CONFIG_MAGIC = utf8Encode("TSC1");
+const SIGN_PREFIX = "TITHE-SPLITCONFIG-V1\n";
+const MAX_DESTINATIONS = 8;
+const MIN_BPS = 100;
+const TOTAL_BPS = 10000;
+const MAX_LABEL_BYTES = 24;
+const ASSET_SOL = 0;
+const ASSET_TOKEN = 1;
+
+// created_at bound (BANKAI RECKONING 2026-10-30, WRAITH-03):
+// [0, 4102444800] — 1970-01-01 to 2100-01-01 UTC, in every
+// implementation. The bound is also what makes the BigInt
+// createdAt carriage below exact for every VALID config
+// (4102444800 < 2^53, HAVOC-04).
+const CREATED_AT_MAX = 4102444800n;
+
+// Script of a letter codepoint for the label homoglyph defence
+// (BANKAI RECKONING 2026-10-30, GHOST-08; mirrors splitconfig.py):
+// a label whose letters MIX Latin with Cyrillic or Greek is
+// refused — that mix is how a lookalike label is built.
+// Single-script non-Latin labels stay allowed.
+function letterScript(cp) {
+  if ((cp >= 0x41 && cp <= 0x5a) || (cp >= 0x61 && cp <= 0x7a) ||
+      cp === 0xaa || cp === 0xb5 || cp === 0xba ||
+      (cp >= 0xc0 && cp <= 0x24f && cp !== 0xd7 && cp !== 0xf7) ||
+      (cp >= 0x1e00 && cp <= 0x1eff) ||
+      (cp >= 0x2c60 && cp <= 0x2c7f) || (cp >= 0xa720 && cp <= 0xa7ff) ||
+      (cp >= 0xff21 && cp <= 0xff3a) || (cp >= 0xff41 && cp <= 0xff5a))
+    return "latin";
+  if ((cp >= 0x370 && cp <= 0x3ff) || (cp >= 0x1f00 && cp <= 0x1fff))
+    return "greek";
+  if ((cp >= 0x400 && cp <= 0x52f) || (cp >= 0x2de0 && cp <= 0x2dff) ||
+      (cp >= 0xa640 && cp <= 0xa69f) || (cp >= 0x1c80 && cp <= 0x1c8f))
+    return "cyrillic";
+  return null;
+}
+
+class SplitConfig {
+  constructor(owner, configVersion, createdAt, assets, remainderIndex, destinations) {
+    this.owner = owner;                       // Uint8Array(32)
+    this.configVersion = configVersion;       // u32
+    // createdAt is carried as BigInt end to end (RECKONING
+    // HAVOC-04): a Number silently rounds above 2^53, which made
+    // the canonical re-encode differ from the signed bytes and
+    // misfire as "non-canonical encoding" instead of the typed
+    // validation refusal an out-of-range value deserves.
+    this.createdAt = BigInt(createdAt);      // i64 unix seconds (BigInt)
+    this.assets = assets;                     // [{tag, mint|null}]
+    this.remainderIndex = remainderIndex;
+    this.destinations = destinations;         // [{pubkey, bps, verified, label}]
+  }
+
+  canonicalBytes() {
+    const parts = [
+      CONFIG_MAGIC, u32LE(this.configVersion), i64LE(this.createdAt), this.owner,
+      new Uint8Array([this.assets.length]),
+    ];
+    for (const a of this.assets) {
+      parts.push(new Uint8Array([a.tag]));
+      if (a.tag === ASSET_TOKEN) parts.push(a.mint);
+    }
+    parts.push(new Uint8Array([this.remainderIndex, this.destinations.length]));
+    for (const d of this.destinations) {
+      const lb = utf8Encode(d.label);
+      parts.push(d.pubkey, u16LE(d.bps),
+        new Uint8Array([d.verified ? 1 : 0, lb.length]), lb);
+    }
+    return concatBytes(...parts);
+  }
+
+  validate() {
+    if (this.owner.length !== 32) throw new ConfigError("owner must be 32 bytes");
+    if (this.configVersion < 1) throw new ConfigError("config_version must be >= 1");
+    // The created_at bound is checked here — inside validate(),
+    // which parse() runs before fromLinkPayload's canonical
+    // comparison — so an out-of-range value refuses with THIS
+    // typed error, never a spurious encoding error (HAVOC-04).
+    if (this.createdAt < 0n || this.createdAt > CREATED_AT_MAX)
+      throw new ConfigError("created_at out of range [0, 4102444800]");
+    if (!(1 <= this.assets.length && this.assets.length <= 2))
+      throw new ConfigError("asset count must be 1..2");
+    const tags = this.assets.map((a) => a.tag);
+    if (new Set(tags).size !== tags.length) throw new ConfigError("duplicate asset tag");
+    for (const a of this.assets) {
+      if (a.tag === ASSET_SOL && a.mint !== null)
+        throw new ConfigError("SOL asset carries no mint");
+      if (a.tag === ASSET_TOKEN) {
+        if (a.mint === null || a.mint.length !== 32)
+          throw new ConfigError("token asset needs a 32-byte mint");
+        if (PROGRAM_IDS_HEX.has(bytesToHex(a.mint)))
+          throw new ConfigError("mint is a program id");
+      }
+      if (a.tag !== ASSET_SOL && a.tag !== ASSET_TOKEN)
+        throw new ConfigError("unknown asset tag");
+    }
+    const n = this.destinations.length;
+    if (!(1 <= n && n <= MAX_DESTINATIONS))
+      throw new ConfigError("destination count must be 1..8");
+    if (!(0 <= this.remainderIndex && this.remainderIndex < n))
+      throw new ConfigError("remainder_index out of range");
+    const seen = new Set();
+    let total = 0;
+    for (const d of this.destinations) {
+      if (d.pubkey.length !== 32) throw new ConfigError("destination pubkey must be 32 bytes");
+      const hex = bytesToHex(d.pubkey);
+      if (PROGRAM_IDS_HEX.has(hex)) throw new ConfigError("destination is a program id");
+      if (seen.has(hex)) throw new ConfigError("duplicate destination");
+      seen.add(hex);
+      if (!(MIN_BPS <= d.bps && d.bps <= TOTAL_BPS))
+        throw new ConfigError("bps out of range [100, 10000]");
+      total += d.bps;
+      const lb = utf8Encode(d.label);
+      if (lb.length > MAX_LABEL_BYTES) throw new ConfigError("label over 24 bytes");
+      if (d.label !== d.label.trim())
+        throw new ConfigError("label has leading/trailing whitespace");
+      const scripts = new Set();
+      for (const ch of d.label) {
+        const cp = ch.codePointAt(0);
+        if (cp < 0x20 || cp === 0x7f) throw new ConfigError("label has control characters");
+        // Invisible / direction-changing characters (BANKAI
+        // 2026-10-30, STORM-11; extended by RECKONING GHOST-08):
+        // bidi controls U+202A–U+202E, zero-width U+200B–U+200D,
+        // BOM U+FEFF, plus U+200E/U+200F marks, U+2028–U+202F,
+        // U+2060 word joiner, U+2066–U+2069 bidi isolates and
+        // U+00AD soft hyphen — refused in every implementation,
+        // matching splitconfig.py.
+        if ((cp >= 0x200b && cp <= 0x200f) || (cp >= 0x2028 && cp <= 0x202f) ||
+            cp === 0x2060 || (cp >= 0x2066 && cp <= 0x2069) ||
+            cp === 0x00ad || cp === 0xfeff)
+          throw new ConfigError("label has invisible or direction-changing characters");
+        const script = letterScript(cp);
+        if (script) scripts.add(script);
+      }
+      // Homoglyph defence (RECKONING GHOST-08): mixed Latin +
+      // Cyrillic/Greek letters in one label are refused;
+      // single-script labels stay allowed.
+      if (scripts.has("latin") && (scripts.has("cyrillic") || scripts.has("greek")))
+        throw new ConfigError(
+          "label mixes Latin letters with Cyrillic or Greek letters — use one script per label");
+    }
+    if (total !== TOTAL_BPS) throw new ConfigError(`bps must sum to 10000, got ${total}`);
+    return true;
+  }
+
+  signingMessage() {
+    return utf8Encode(SIGN_PREFIX + b64urlNopad(this.canonicalBytes()));
+  }
+  fingerprint() {
+    return bytesToHex(sha256(this.canonicalBytes()).slice(0, 4));
+  }
+  verifySignature(signature) {
+    try { this.validate(); } catch { return false; }
+    return ed25519Verify(signature, this.signingMessage(), this.owner);
+  }
+  toLinkPayload(signature) {
+    if (!this.verifySignature(signature))
+      throw new ConfigError("refusing to encode a payload whose signature does not verify");
+    return b64urlNopad(concatBytes(this.canonicalBytes(), signature));
+  }
+
+  static fromLinkPayload(payload) {
+    const raw = b64urlDecode(payload);
+    if (raw.length < 65) throw new ConfigError("payload too short");
+    const cfgBytes = raw.slice(0, raw.length - 64);
+    const signature = raw.slice(raw.length - 64);
+    const cfg = SplitConfig.parse(cfgBytes);
+    if (!bytesEqual(cfg.canonicalBytes(), cfgBytes))
+      throw new ConfigError("non-canonical encoding");
+    if (!cfg.verifySignature(signature))
+      throw new ConfigError("signature does not verify");
+    return { config: cfg, signature };
+  }
+
+  static parse(data) {
+    let pos = 0;
+    const take = (nBytes) => {
+      if (pos + nBytes > data.length) throw new ConfigError("truncated config");
+      const chunk = data.slice(pos, pos + nBytes);
+      pos += nBytes;
+      return chunk;
+    };
+    if (!bytesEqual(take(4), CONFIG_MAGIC)) throw new ConfigError("bad magic");
+    const dv = () => new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const configVersion = dv().getUint32(pos, true); take(4);
+    // BigInt, never Number (RECKONING HAVOC-04): the exact signed
+    // i64 survives to canonicalBytes(), so an in-bound value
+    // re-encodes byte-identically and an out-of-bound value meets
+    // validate()'s typed refusal — not a precision-mangled
+    // "non-canonical encoding" error.
+    const createdAt = dv().getBigInt64(pos, true); take(8);
+    const owner = take(32);
+    const assetCount = take(1)[0];
+    const assets = [];
+    for (let i = 0; i < assetCount; i++) {
+      const tag = take(1)[0];
+      const mint = tag === ASSET_TOKEN ? take(32) : null;
+      assets.push({ tag, mint });
+    }
+    const remainderIndex = take(1)[0];
+    const destCount = take(1)[0];
+    const destinations = [];
+    for (let i = 0; i < destCount; i++) {
+      const pubkey = take(32);
+      const bps = dv().getUint16(pos, true); take(2);
+      const verifiedByte = take(1)[0];
+      if (verifiedByte !== 0 && verifiedByte !== 1)
+        throw new ConfigError("verified flag must be 0 or 1");
+      const labelLen = take(1)[0];
+      let label;
+      try { label = utf8DecodeStrict(take(labelLen)); }
+      catch { throw new ConfigError("label is not valid UTF-8"); }
+      destinations.push({ pubkey, bps, verified: verifiedByte === 1, label });
+    }
+    if (pos !== data.length) throw new ConfigError("trailing bytes");
+    const cfg = new SplitConfig(owner, configVersion, createdAt, assets,
+      remainderIndex, destinations);
+    cfg.validate();
+    return cfg;
+  }
+}
+
+// -------------------------------------------------------------- split math
+const SOL_MIN_SHARE = 890880n;  // rent-exempt minimum for a 0-data system entry
+const TOKEN_MIN_SHARE = 1n;
+
+function computeShares(amount, bpsList, remainderIndex) {
+  const amt = toBigAmount(amount);
+  if (amt < 0n) throw new Error("amount must be >= 0");
+  if (bpsList.reduce((a, b) => a + b, 0) !== TOTAL_BPS)
+    throw new Error("bps must sum to 10000");
+  const shares = bpsList.map((b) => amt * BigInt(b) / 10000n);
+  const residual = amt - shares.reduce((a, b) => a + b, 0n);
+  shares[remainderIndex] += residual;
+  return shares;
+}
+function minPaymentAmount(bpsList, remainderIndex, isSol) {
+  // Defence at the money-math layer (BANKAI 2026-10-30, LEDGER-9,
+  // mirroring splitmath.py): out-of-spec bps below the 100 minimum
+  // are refused here, cleanly.
+  if (bpsList.some((b) => b < MIN_BPS))
+    throw new Error("bps below the 100 minimum are out of spec for a split");
+  const minShare = isSol ? SOL_MIN_SHARE : TOKEN_MIN_SHARE;
+  const minBps = BigInt(Math.min(...bpsList));
+  // ceil(min_share * 10000 / min_bps) is a proven UPPER bound, not
+  // always the minimum: when the smallest-bps recipient holds the
+  // remainder, the residual lifts its share over the floor at a
+  // smaller amount (bps [6000,4000], remainder 1, token: bound 3,
+  // true minimum 2 — Python core regression, 2026-10-31). Walk down
+  // from the bound while the amount below still clears every floor.
+  let amount = (minShare * 10000n + minBps - 1n) / minBps;
+  // Walk bound: in spec (bps >= 100, at most 8 destinations) the
+  // walk is provably short (brute-force max 117, theoretical bound
+  // ~701); the 10000 cap is defensive only, and exhausting it is a
+  // clean refusal, mirroring splitmath.py.
+  let finished = false;
+  for (let guard = 0; guard < 10000; guard++) {
+    if (amount <= 0n) { finished = true; break; }
+    const below = computeShares(amount - 1n, bpsList, remainderIndex);
+    if (below.every((s) => s >= minShare)) amount -= 1n;
+    else { finished = true; break; }
+  }
+  if (!finished)
+    throw new Error("minimum-payment walk exceeded its bound — refusing rather than returning an unverified minimum");
+  const shares = computeShares(amount, bpsList, remainderIndex);
+  if (!shares.every((s) => s >= minShare)) throw new Error("min amount formula failed");
+  if (amount > 0n) {
+    const below = computeShares(amount - 1n, bpsList, remainderIndex);
+    if (!below.some((s) => s < minShare)) throw new Error("min amount is not minimal");
+  }
+  return amount;
+}
+function checkPaymentAmount(amount, bpsList, remainderIndex, isSol) {
+  const minimum = minPaymentAmount(bpsList, remainderIndex, isSol);
+  if (toBigAmount(amount) < minimum)
+    throw new Error(`amount ${amount} is below the minimum ${minimum} for this split (a destination's share would be dust)`);
+  return minimum;
+}
+
+// ---------------------------------------------------------- Solana legacy
+function shortvecEncode(n) {
+  const out = [];
+  let v = n;
+  while (true) {
+    const b = v & 0x7f;
+    v >>= 7;
+    if (v) out.push(b | 0x80);
+    else { out.push(b); return new Uint8Array(out); }
+  }
+}
+function shortvecDecode(data, pos) {
+  let value = 0, shift = 0;
+  while (true) {
+    if (pos >= data.length) throw new Error("truncated shortvec");
+    const b = data[pos];
+    pos += 1;
+    value |= (b & 0x7f) << shift;
+    if (!(b & 0x80)) return [value, pos];
+    shift += 7;
+    if (shift > 28) throw new Error("shortvec too long");
+  }
+}
+function createProgramAddress(seeds, programId) {
+  return sha256(concatBytes(...seeds, programId, utf8Encode("ProgramDerivedAddress")));
+}
+function findProgramAddress(seeds, programId) {
+  for (let bump = 255; bump >= 0; bump--) {
+    const candidate = createProgramAddress([...seeds, new Uint8Array([bump])], programId);
+    if (!isOnCurve(candidate)) return { address: candidate, bump };
+  }
+  throw new Error("no viable bump");
+}
+function deriveAta(owner, mint, tokenProgram) {
+  return findProgramAddress([owner, tokenProgram, mint], ATA_PROGRAM).address;
+}
+
+// Instruction shape mirrors the Python model:
+//   { programId: Uint8Array,
+//     accounts: [{ pubkey: Uint8Array, isSigner: bool, isWritable: bool }],
+//     data: Uint8Array }
+function makeMeta(pubkey, isSigner, isWritable) { return { pubkey, isSigner, isWritable }; }
+function metaEqual(a, b) {
+  return bytesEqual(a.pubkey, b.pubkey) && a.isSigner === b.isSigner && a.isWritable === b.isWritable;
+}
+function instructionEqual(a, b) {
+  return bytesEqual(a.programId, b.programId)
+    && a.accounts.length === b.accounts.length
+    && a.accounts.every((m, i) => metaEqual(m, b.accounts[i]))
+    && bytesEqual(a.data, b.data);
+}
+
+function ixComputeBudgetPrice(microlamports) {
+  const v = toBigAmount(microlamports);
+  return { programId: COMPUTE_BUDGET_PROGRAM, accounts: [],
+    data: concatBytes(new Uint8Array([3]), u64LE(v)) };
+}
+function ixSystemTransfer(payer, dest, lamports) {
+  return { programId: SYSTEM_PROGRAM,
+    accounts: [makeMeta(payer, true, true), makeMeta(dest, false, true)],
+    data: concatBytes(u32LE(2), u64LE(toBigAmount(lamports))) };
+}
+function ixCreateAtaIdempotent(payer, ata, owner, mint, tokenProgram) {
+  return { programId: ATA_PROGRAM,
+    accounts: [
+      makeMeta(payer, true, true),
+      makeMeta(ata, false, true),
+      makeMeta(owner, false, false),
+      makeMeta(mint, false, false),
+      makeMeta(SYSTEM_PROGRAM, false, false),
+      makeMeta(tokenProgram, false, false),
+    ],
+    data: new Uint8Array([1]) };
+}
+function ixTransferChecked(sourceAta, mint, destAta, authority, amount, decimals, tokenProgram) {
+  return { programId: tokenProgram,
+    accounts: [
+      makeMeta(sourceAta, false, true),
+      makeMeta(mint, false, false),
+      makeMeta(destAta, false, true),
+      makeMeta(authority, true, false),
+    ],
+    data: concatBytes(new Uint8Array([12]), u64LE(toBigAmount(amount)), new Uint8Array([decimals])) };
+}
+
+// Compile with Solana's ordering: fee payer first (signer, writable);
+// then signers (writable before readonly); then non-signers (writable
+// before readonly). Stable within groups.
+function compileMessage(feePayer, instructions, recentBlockhash) {
+  const order = [];
+  const flags = new Map(); // hex -> [isSigner, isWritable]
+  const add = (pubkey, signer, writable) => {
+    const key = bytesToHex(pubkey);
+    if (!flags.has(key)) { flags.set(key, [signer, writable]); order.push(pubkey); }
+    else {
+      const f = flags.get(key);
+      f[0] = f[0] || signer;
+      f[1] = f[1] || writable;
+    }
+  };
+  add(feePayer, true, true);
+  for (const ix of instructions) {
+    for (const a of ix.accounts) add(a.pubkey, a.isSigner, a.isWritable);
+    add(ix.programId, false, false);
+  }
+  const feeHex = bytesToHex(feePayer);
+  const sortKey = (pk) => {
+    const [signer, writable] = flags.get(bytesToHex(pk));
+    if (bytesToHex(pk) === feeHex) return [0, 0];
+    if (signer) return [1, writable ? 0 : 1];
+    return [2, writable ? 0 : 1];
+  };
+  const keys = [...order].sort((a, b) => {
+    const ka = sortKey(a), kb = sortKey(b);
+    return ka[0] - kb[0] || ka[1] - kb[1];
+  });
+  const nSig = keys.filter((k) => flags.get(bytesToHex(k))[0]).length;
+  const nRoSigned = keys.slice(0, nSig).filter((k) => !flags.get(bytesToHex(k))[1]).length;
+  const nRoUnsigned = keys.slice(nSig).filter((k) => !flags.get(bytesToHex(k))[1]).length;
+  const index = new Map(keys.map((k, i) => [bytesToHex(k), i]));
+  const parts = [new Uint8Array([nSig, nRoSigned, nRoUnsigned]), shortvecEncode(keys.length)];
+  for (const k of keys) parts.push(k);
+  parts.push(recentBlockhash);
+  parts.push(shortvecEncode(instructions.length));
+  for (const ix of instructions) {
+    parts.push(new Uint8Array([index.get(bytesToHex(ix.programId))]));
+    parts.push(shortvecEncode(ix.accounts.length));
+    parts.push(new Uint8Array(ix.accounts.map((a) => index.get(bytesToHex(a.pubkey)))));
+    parts.push(shortvecEncode(ix.data.length));
+    parts.push(ix.data);
+  }
+  return concatBytes(...parts);
+}
+function serializeUnsignedTx(message, numSignatures) {
+  return concatBytes(shortvecEncode(numSignatures), new Uint8Array(64 * numSignatures), message);
+}
+
+// Decode a legacy message (for the gate): returns
+// { keys, header: [nSig, nRoSigned, nRoUnsigned], blockhash, instructions }
+function decodeMessage(message) {
+  let pos = 0;
+  const nSig = message[0], nRoSigned = message[1], nRoUnsigned = message[2];
+  pos = 3;
+  let nKeys; [nKeys, pos] = shortvecDecode(message, pos);
+  const keys = [];
+  for (let i = 0; i < nKeys; i++) { keys.push(message.slice(pos, pos + 32)); pos += 32; }
+  const blockhash = message.slice(pos, pos + 32);
+  pos += 32;
+  const meta = (idx) => {
+    const signer = idx < nSig;
+    const writable = signer ? idx < nSig - nRoSigned : idx < nKeys - nRoUnsigned;
+    return makeMeta(keys[idx], signer, writable);
+  };
+  let nIx; [nIx, pos] = shortvecDecode(message, pos);
+  const ixs = [];
+  for (let i = 0; i < nIx; i++) {
+    const program = keys[message[pos]]; pos += 1;
+    let nAcc; [nAcc, pos] = shortvecDecode(message, pos);
+    const metas = [];
+    for (let j = 0; j < nAcc; j++) { metas.push(meta(message[pos])); pos += 1; }
+    let nData; [nData, pos] = shortvecDecode(message, pos);
+    const data = message.slice(pos, pos + nData); pos += nData;
+    ixs.push({ programId: program, accounts: metas, data });
+  }
+  if (pos !== message.length) throw new Error("trailing bytes in message");
+  return { keys, header: [nSig, nRoSigned, nRoUnsigned], blockhash, instructions: ixs };
+}
+
+// ------------------------------------------------------------ mint gate
+// The one mint-shape ruling, in the core so the page and the core
+// cannot drift (BANKAI 2026-10-30, LEDGER-1/LEDGER-6/STORM-06,
+// mirroring mintread.py): transfer-hook mints and transfer-fee
+// mints are REFUSED in v1. A shape may carry the ruling data as
+// { extensions: [...], hasHook, transferFee } (this page's reader)
+// or with the Python reader's snake_case keys.
+function mintGate(shape) {
+  if (!shape)
+    throw new BuildError("token payment needs the mint shape (program and decimals)");
+  const extensions = shape.extensions || [];
+  const hasHook = shape.hasHook || shape.has_hook || extensions.includes("transferHook");
+  if (hasHook)
+    throw new MintError("mint has a transfer hook — splits in this mint are not supported in v1 (extra accounts break the size budget)");
+  const fee = shape.transferFee !== undefined ? shape.transferFee : shape.transfer_fee;
+  if (fee || extensions.includes("transferFeeConfig"))
+    throw new MintError("mint charges a transfer fee — splits in this mint are not supported in v1: the amount shown would not be the amount received, and this version does not present a gross amount as if it were received");
+  return { shape, netNote: "net == gross" };
+}
+
+// --------------------------------------------------------------- builder
+const MAX_PRIORITY_MICROLAMPORTS = 50000;
+
+// ataMissing: a Set of destination-ATA pubkeys, each as a lowercase
+// hex string (bytesToHex of the 32-byte key) — the JS stand-in for the
+// Python set of bytes. mintShape: { programId: Uint8Array, decimals }.
+function ataMissingHexSet(ataMissing) {
+  if (!ataMissing) return new Set();
+  const out = new Set();
+  for (const item of ataMissing) {
+    out.add(typeof item === "string" ? item.toLowerCase() : bytesToHex(item));
+  }
+  return out;
+}
+
+// The one derivation both the builder and the gate use — the gate
+// re-derives independently and compares against the decoded tx.
+function expectedInstructions(cfg, assetIndex, amount, payer, ataMissing, mintShape, priorityMicrolamports) {
+  const amt = toBigAmount(amount);
+  const priority = priorityMicrolamports || 0;
+  const asset = cfg.assets[assetIndex];
+  if (!asset) throw new BuildError("asset index out of range");
+  const bps = cfg.destinations.map((d) => d.bps);
+  const isSol = asset.tag === ASSET_SOL;
+  const minimum = minPaymentAmount(bps, cfg.remainderIndex, isSol);
+  if (amt < minimum) throw new BuildError(`amount ${amt} below minimum ${minimum} for this split`);
+  const shares = computeShares(amt, bps, cfg.remainderIndex);
+  const ixs = [];
+  if (priority) {
+    if (priority > MAX_PRIORITY_MICROLAMPORTS)
+      throw new BuildError("priority fee above the whitelist cap");
+    ixs.push(ixComputeBudgetPrice(priority));
+  }
+  if (isSol) {
+    cfg.destinations.forEach((d, i) => ixs.push(ixSystemTransfer(payer, d.pubkey, shares[i])));
+  } else {
+    if (!mintShape) throw new BuildError("token payment needs the mint shape (program and decimals)");
+    // The mint-shape ruling is enforced HERE, in the builder layer:
+    // fee and hook mints are refused by the build path itself, even
+    // if a caller skipped its own gate call (LEDGER-6).
+    try { mintGate(mintShape); }
+    catch (e) { throw new BuildError(e.message); }
+    const tokenProgram = mintShape.programId;
+    const decimals = mintShape.decimals;
+    const missing = ataMissingHexSet(ataMissing);
+    const sourceAta = deriveAta(payer, asset.mint, tokenProgram);
+    cfg.destinations.forEach((d, i) => {
+      const destAta = deriveAta(d.pubkey, asset.mint, tokenProgram);
+      if (missing.has(bytesToHex(destAta)))
+        ixs.push(ixCreateAtaIdempotent(payer, destAta, d.pubkey, asset.mint, tokenProgram));
+      ixs.push(ixTransferChecked(sourceAta, asset.mint, destAta, payer, shares[i], decimals, tokenProgram));
+    });
+  }
+  return { instructions: ixs, shares };
+}
+
+function buildSplitTx(cfg, assetIndex, amount, payer, recentBlockhash, ataMissing, mintShape, priorityMicrolamports = 0) {
+  const { instructions: ixs, shares } = expectedInstructions(
+    cfg, assetIndex, amount, payer, ataMissing, mintShape, priorityMicrolamports);
+  const message = compileMessage(payer, ixs, recentBlockhash);
+  const nSig = message[0];
+  const tx = serializeUnsignedTx(message, nSig);
+  if (tx.length > MAX_TX_SIZE)
+    throw new BuildError(
+      `transaction is ${tx.length} bytes, over the ${MAX_TX_SIZE}-byte limit for this split — refusing to build (no recipient is ever dropped to make a split fit)`);
+  const nKeys = decodeMessage(message).keys.length;
+  if (nKeys > 64) throw new BuildError(`transaction uses ${nKeys} entries, over the 64 limit`);
+  if (ixs.length > 64) throw new BuildError("instruction count over the 64 limit");
+  return { message, tx, shares };
+}
+
+// ------------------------------------------------------------------ gate
+function decodeCompare(cfg, assetIndex, amount, payer, message, ataMissing, mintShape, priorityMicrolamports = 0) {
+  const decoded = decodeMessage(message);
+  const { keys, header, instructions: ixs } = decoded;
+  const [nSig] = header;
+  if (!bytesEqual(keys[0], payer)) throw new GateError("fee payer is not the payer");
+  const signerKeys = keys.slice(0, nSig);
+  if (signerKeys.length !== 1 || !bytesEqual(signerKeys[0], payer))
+    throw new GateError("transaction requires a signer other than the payer");
+  const { instructions: expectedRaw } = expectedInstructions(
+    cfg, assetIndex, amount, payer, ataMissing, mintShape, priorityMicrolamports);
+  // Compiled-message semantics: an entry's privileges in a legacy
+  // message are the UNION over every instruction that uses it (the
+  // fee payer is a writable signer even where a transfer lists the
+  // authority as a readonly signer). Promote the expected metas to
+  // message-level flags before comparing, or every token split
+  // falsely fails its own gate (caught by the Phase 1 suite).
+  const union = new Map([[bytesToHex(payer), [true, true]]]);
+  for (const eix of expectedRaw) {
+    for (const a of eix.accounts) {
+      const key = bytesToHex(a.pubkey);
+      const [s, w] = union.get(key) || [false, false];
+      union.set(key, [s || a.isSigner, w || a.isWritable]);
+    }
+  }
+  const expected = expectedRaw.map((e) => ({
+    programId: e.programId,
+    accounts: e.accounts.map((a) => {
+      const [s, w] = union.get(bytesToHex(a.pubkey));
+      return makeMeta(a.pubkey, s, w);
+    }),
+    data: e.data,
+  }));
+  if (ixs.length !== expected.length)
+    throw new GateError(`instruction count mismatch: tx has ${ixs.length}, split requires ${expected.length}`);
+  for (let i = 0; i < ixs.length; i++) {
+    if (!instructionEqual(ixs[i], expected[i]))
+      throw new GateError(
+        `instruction ${i} does not match the verified split: tx has ${describeInstruction(ixs[i])}, split requires ${describeInstruction(expected[i])}`);
+  }
+  return true;
+}
+function describeInstruction(ix) {
+  const metas = ix.accounts.map((a) =>
+    `<${b58encode(a.pubkey).slice(0, 8)} s=${a.isSigner ? 1 : 0} w=${a.isWritable ? 1 : 0}>`).join(" ");
+  return `Ix<${b58encode(ix.programId).slice(0, 8)} ${metas} ${bytesToHex(ix.data)}>`;
+}
+
+// ------------------------------------------------- simulation delta check
+// The simulation balance-delta check, implemented for real (BANKAI
+// 2026-10-30, LEDGER-2/STORM-03; mirrors gate.py exactly).
+//
+// Expected-delta model — every figure exact, in lamports / token
+// base units:
+// - fee F = 5,000 lamports (one signature; decode-compare enforces
+//   exactly one) + prioritisation fee ceil(price * CU-limit / 1e6),
+//   CU-limit = min(200,000 per non-compute-budget instruction,
+//   1,400,000); F = 5,000 exactly whenever the price is 0 (every
+//   shipped flow today).
+// - SOL split: payer lamports −(amount + F); each destination
+//   lamports +share_i.
+// - Token split: payer lamports −(F + ATA_RENT * C), C = destination
+//   ATAs created by this tx; payer's source ATA token −amount,
+//   lamports 0; each destination ATA token +share_i, lamports
+//   +ATA_RENT if this tx creates it (rent sits in the new account),
+//   else 0. ATA_RENT is the classic 165-byte figure, 2,039,280.
+// - Returned deltas are aggregated PER ADDRESS (RECKONING
+//   HAVOC-01): a destination that is the payer nets its share
+//   against the payer's outflow, and a source ATA that is also a
+//   destination ATA nets likewise.
+const BASE_FEE_LAMPORTS_PER_SIGNATURE = 5000n;
+
+function priorityFeeLamports(priorityMicrolamports, nNonBudgetIxs) {
+  const price = BigInt(priorityMicrolamports || 0);
+  if (!price) return 0n;
+  let cuLimit = 200000n * BigInt(Math.max(nNonBudgetIxs, 1));
+  if (cuLimit > 1400000n) cuLimit = 1400000n;
+  return (price * cuLimit + 999999n) / 1000000n;
+}
+
+// Net expected deltas PER ADDRESS (BANKAI RECKONING 2026-10-30,
+// HAVOC-01; mirrors gate.py): a self-split's payer is also a
+// destination, and its source ATA can be a destination ATA — the
+// chain moves only the NET figure per address, so duplicates are
+// summed (first-seen order kept) before any comparison.
+function aggregateDeltas(addresses, deltas) {
+  const order = [];
+  const merged = new Map();
+  addresses.forEach((addr, i) => {
+    const key = bytesToHex(addr);
+    if (!merged.has(key)) { merged.set(key, { lamports: 0n, token: null }); order.push(addr); }
+    const m = merged.get(key);
+    m.lamports += deltas[i].lamports;
+    if (deltas[i].token !== null)
+      m.token = (m.token === null ? 0n : m.token) + deltas[i].token;
+  });
+  return { addresses: order, deltas: order.map((a) => merged.get(bytesToHex(a))) };
+}
+
+// Returns { addresses: [Uint8Array], deltas: [{lamports, token}] }
+// in request order, aggregated per address (see aggregateDeltas);
+// token is null where the account is not a token account.
+function expectedAccountDeltas(cfg, assetIndex, amount, payer, ataMissing, mintShape, priorityMicrolamports = 0) {
+  const { instructions: ixs, shares } = expectedInstructions(
+    cfg, assetIndex, amount, payer, ataMissing, mintShape, priorityMicrolamports);
+  const nNonBudget = ixs.filter((ix) => !bytesEqual(ix.programId, COMPUTE_BUDGET_PROGRAM)).length;
+  const fee = BASE_FEE_LAMPORTS_PER_SIGNATURE + priorityFeeLamports(priorityMicrolamports, nNonBudget);
+  const amt = toBigAmount(amount);
+  const asset = cfg.assets[assetIndex];
+  if (asset.tag === ASSET_SOL) {
+    const addresses = [payer, ...cfg.destinations.map((d) => d.pubkey)];
+    const deltas = [{ lamports: -(amt + fee), token: null },
+      ...shares.map((s) => ({ lamports: s, token: null }))];
+    return aggregateDeltas(addresses, deltas);
+  }
+  const tokenProgram = mintShape.programId;
+  const missing = ataMissingHexSet(ataMissing);
+  const sourceAta = deriveAta(payer, asset.mint, tokenProgram);
+  const destAtas = cfg.destinations.map((d) => deriveAta(d.pubkey, asset.mint, tokenProgram));
+  const creates = destAtas.filter((a) => missing.has(bytesToHex(a))).length;
+  const rent = BigInt(ATA_RENT_LAMPORTS_CLASSIC);
+  const addresses = [payer, sourceAta, ...destAtas];
+  const deltas = [
+    { lamports: -(fee + rent * BigInt(creates)), token: null },
+    { lamports: 0n, token: -amt },
+    ...destAtas.map((a, i) => ({
+      lamports: missing.has(bytesToHex(a)) ? rent : 0n,
+      token: shares[i],
+    })),
+  ];
+  return aggregateDeltas(addresses, deltas);
+}
+
+// Parse one account entry (pre or post) into {lamports, token}.
+// A null entry means the account does not exist yet: state zero.
+// Any unparseable state throws — missing state refuses, never passes.
+function parseAccountState(entry, wantToken) {
+  if (entry === null || entry === undefined)
+    return { lamports: 0n, token: wantToken ? 0n : null };
+  if (entry.lamports === undefined || entry.lamports === null)
+    throw new GateError("simulation account state has no lamports figure");
+  const lamports = BigInt(entry.lamports);
+  if (!wantToken) return { lamports, token: null };
+  const data = entry.data;
+  let token = null;
+  if (data && !Array.isArray(data) && data.parsed && data.parsed.info &&
+      data.parsed.info.tokenAmount) {
+    try { token = BigInt(data.parsed.info.tokenAmount.amount); } catch { token = null; }
+  } else if (Array.isArray(data) && data.length) {
+    try {
+      const raw = b64Decode(data[0], false);
+      token = bytesToBigIntLE(raw.slice(64, 72));
+    } catch { token = null; }
+  }
+  if (token === null)
+    throw new GateError("simulation account state for a token account could not be read");
+  return { lamports, token };
+}
+
+function checkSimulationResult(resultValue, expectedDeltas = null, preStates = null) {
+  // resultValue: the `value` of a simulateTransaction RPC result.
+  // With expectedDeltas (from expectedAccountDeltas) + preStates,
+  // every account's (post − pre) must equal its expected delta
+  // exactly; a delta short by even 1 refuses, and missing account
+  // state refuses rather than passing.
+  if (resultValue.err !== null && resultValue.err !== undefined)
+    throw new GateError(`simulation failed: ${JSON.stringify(resultValue.err)}`);
+  if (expectedDeltas !== null && expectedDeltas !== undefined) {
+    const postStates = resultValue.accounts;
+    if (!postStates || postStates.length !== expectedDeltas.length)
+      throw new GateError("simulation returned missing account states — refusing");
+    if (!preStates || preStates.length !== expectedDeltas.length)
+      throw new GateError("no pre-simulation account states to check deltas against — refusing");
+    for (let i = 0; i < expectedDeltas.length; i++) {
+      const want = expectedDeltas[i];
+      const wantToken = want.token !== null;
+      const pre = parseAccountState(preStates[i], wantToken);
+      const post = parseAccountState(postStates[i], wantToken);
+      if (post.lamports - pre.lamports !== want.lamports)
+        throw new GateError(
+          `simulation balance check failed at account ${i}: lamports moved ${post.lamports - pre.lamports}, the split requires ${want.lamports}`);
+      if (wantToken && post.token - pre.token !== want.token)
+        throw new GateError(
+          `simulation balance check failed at account ${i}: token amount moved ${post.token - pre.token}, the split requires ${want.token}`);
+    }
+  }
+  return true;
+}
+
+// RPC fetches time out (BANKAI 2026-10-30, STORM-04 payer leg): a
+// blackhole endpoint must resolve to the plain error surface, not
+// hang the page on "Running the checks…" forever.
+const RPC_TIMEOUT_MS = 15000;
+async function fetchWithTimeout(doFetch, url, opts) {
+  if (typeof AbortController === "undefined") return doFetch(url, opts);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), RPC_TIMEOUT_MS);
+  try { return await doFetch(url, { ...opts, signal: ctrl.signal }); }
+  finally { clearTimeout(timer); }
+}
+function rpcTimeoutNote(e) {
+  return e && e.name === "AbortError"
+    ? `the RPC endpoint did not answer within ${RPC_TIMEOUT_MS / 1000} seconds`
+    : e.message;
+}
+
+async function rpcViaFetch(doFetch, rpcEndpoint, method, params) {
+  let resp;
+  try {
+    resp = await fetchWithTimeout(doFetch, rpcEndpoint, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+  } catch (e) {
+    throw new GateError(`simulation request could not reach the RPC endpoint: ${rpcTimeoutNote(e)}`);
+  }
+  if (!resp.ok) throw new GateError(`simulation request failed: HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.error)
+    throw new GateError(`simulation request failed: ${JSON.stringify(json.error)}`);
+  return json.result;
+}
+
+// POST simulateTransaction for the exact tx bytes to a configurable RPC
+// endpoint; refuse (throw GateError) unless the result's err is null.
+// When simContext ({cfg, assetIndex, amount, payer, ataMissing,
+// mintShape, priorityMicrolamports}) is given, the exact
+// balance-delta check also runs: pre-states are fetched with
+// getMultipleAccounts (jsonParsed), the simulation is requested with
+// those accounts' post-states (jsonParsed), and every delta must
+// match expectedAccountDeltas exactly.
+async function simulateGate(rpcEndpoint, txBytes, fetchImpl, simContext = null) {
+  const doFetch = fetchImpl || (typeof fetch !== "undefined" ? fetch : null);
+  if (!doFetch) throw new GateError("no fetch available to reach the RPC endpoint");
+  if (!rpcEndpoint) throw new GateError("no RPC endpoint set — simulation cannot run");
+  let expected = null, preStates = null;
+  const simConfig = { sigVerify: false, replaceRecentBlockhash: true, encoding: "base64" };
+  if (simContext) {
+    expected = expectedAccountDeltas(
+      simContext.cfg, simContext.assetIndex, simContext.amount, simContext.payer,
+      simContext.ataMissing, simContext.mintShape, simContext.priorityMicrolamports || 0);
+    const addrB58 = expected.addresses.map((a) => b58encode(a));
+    const pre = await rpcViaFetch(doFetch, rpcEndpoint, "getMultipleAccounts",
+      [addrB58, { encoding: "jsonParsed" }]);
+    preStates = pre && pre.value;
+    simConfig.accounts = { addresses: addrB58, encoding: "jsonParsed" };
+  }
+  const result = await rpcViaFetch(doFetch, rpcEndpoint, "simulateTransaction",
+    [base64StdEncode(txBytes), simConfig]);
+  const value = result && result.value;
+  if (!value) throw new GateError("simulation returned no result value");
+  checkSimulationResult(value, expected ? expected.deltas : null, preStates);
+  return value;
+}
+
+// ---------------------------------------------------------------- exports
+return {
+  ConfigError, BuildError, GateError, MintError,
+  concatBytes, bytesEqual, bytesToHex, hexToBytes, utf8Encode, utf8DecodeStrict,
+  b58encode, b58decode, pubkeyFromBase58,
+  b64urlEncode, b64urlDecode, b64urlNopad, base64StdEncode,
+  sha256, sha256Hex, sha512,
+  ed25519Verify, isOnCurve,
+  SYSTEM_PROGRAM, TOKEN_PROGRAM, TOKEN2022_PROGRAM, ATA_PROGRAM,
+  COMPUTE_BUDGET_PROGRAM, MEMO_PROGRAM, USDC_MINT, SKR_MINT,
+  MAX_TX_SIZE, ATA_RENT_LAMPORTS_CLASSIC, PROGRAM_IDS_HEX,
+  SplitConfig, SIGN_PREFIX, ASSET_SOL, ASSET_TOKEN, CREATED_AT_MAX,
+  MAX_DESTINATIONS, MIN_BPS, TOTAL_BPS, MAX_LABEL_BYTES,
+  SOL_MIN_SHARE, TOKEN_MIN_SHARE, computeShares, minPaymentAmount, checkPaymentAmount,
+  shortvecEncode, shortvecDecode, createProgramAddress, findProgramAddress, deriveAta,
+  makeMeta, instructionEqual, ixComputeBudgetPrice, ixSystemTransfer,
+  ixCreateAtaIdempotent, ixTransferChecked,
+  compileMessage, serializeUnsignedTx, decodeMessage,
+  MAX_PRIORITY_MICROLAMPORTS, ataMissingHexSet, expectedInstructions, buildSplitTx,
+  mintGate, BASE_FEE_LAMPORTS_PER_SIGNATURE, priorityFeeLamports,
+  expectedAccountDeltas, parseAccountState,
+  decodeCompare, checkSimulationResult, simulateGate, RPC_TIMEOUT_MS,
+};
+
+})();
+
+if (typeof module !== "undefined" && module.exports) module.exports = TitheCore;
+if (typeof globalThis !== "undefined") globalThis.TitheCore = TitheCore;
+</script>
+<script>
+"use strict";
+const C = window.TitheCore;
+const $ = (id) => document.getElementById(id);
+const state = {
+  cfg: null, signature: null, payer: null,
+  wsWallet: null, wsAccount: null, pending: null,
+};
+
+function failClosed(reason) {
+  $("fatalReason").textContent = reason;
+  $("fatal").classList.remove("hidden");
+  $("configCard").classList.add("hidden");
+  $("payCard").classList.add("hidden");
+}
+function setStatus(text) { $("status").textContent = text; }
+function invalidatePending() {
+  state.pending = null;
+  $("signBtn").disabled = true;
+  $("checkOut").classList.add("hidden");
+}
+
+// ---- plain integer decimal handling (no floats anywhere in money math) --
+function parseDecimalToBase(str, decimals) {
+  const m = /^([0-9]+)(?:\.([0-9]+))?$/.exec(String(str).trim());
+  if (!m) throw new Error("Enter the amount as a plain number, for example 0.25.");
+  const frac = m[2] || "";
+  if (frac.length > decimals)
+    throw new Error(`That amount has more than ${decimals} decimal places, which this asset cannot carry.`);
+  const scale = 10n ** BigInt(decimals);
+  return BigInt(m[1]) * scale + BigInt(frac.padEnd(decimals, "0") || "0");
+}
+function formatBase(amount, decimals) {
+  const scale = 10n ** BigInt(decimals);
+  const whole = amount / scale;
+  let frac = (amount % scale).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : `${whole}`;
+}
+function formatPct(bps) {
+  const whole = Math.floor(bps / 100), frac = bps % 100;
+  return frac ? `${whole}.${String(frac).padStart(2, "0")}%` : `${whole}%`;
+}
+function truncKey(bytes) {
+  const s = C.b58encode(bytes);
+  return s.slice(0, 6) + "…" + s.slice(-6);
+}
+function assetName(asset) {
+  if (asset.tag === C.ASSET_SOL) return "SOL";
+  if (C.bytesEqual(asset.mint, C.USDC_MINT)) return "USDC";
+  if (C.bytesEqual(asset.mint, C.SKR_MINT)) return "SKR";
+  return "Token " + truncKey(asset.mint);
+}
+state.mintShapes = new Map(); // assetIndex -> {programId, decimals}
+
+// ---- RPC helpers ---------------------------------------------------------
+async function rpcCall(endpoint, method, params) {
+  let resp;
+  try {
+    // 15s timeout (BANKAI 2026-10-30, STORM-04 payer leg): a
+    // blackhole endpoint resolves to the plain error below instead
+    // of hanging the page forever.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      resp = await fetch(endpoint, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError")
+      throw new Error("The RPC endpoint did not answer within 15 seconds.");
+    throw new Error(`The RPC endpoint could not be reached: ${e.message}`);
+  }
+  if (!resp.ok) throw new Error(`The RPC endpoint answered HTTP ${resp.status}.`);
+  const json = await resp.json();
+  if (json.error) throw new Error(`The RPC endpoint returned an error: ${JSON.stringify(json.error)}`);
+  return json.result;
+}
+
+// Read a mint's shape from getAccountInfo (jsonParsed), the way the
+// reference mint reader does: program owner, decimals, extensions.
+// The fee/hook ruling itself lives in the core (C.mintGate) so this
+// page and the core cannot drift (BANKAI 2026-10-30, LEDGER-6): a
+// transfer hook or a transfer fee ends the payment, because this
+// page will not show a gross figure as if it were net.
+async function readMintShape(endpoint, mintBytes) {
+  const result = await rpcCall(endpoint, "getAccountInfo",
+    [C.b58encode(mintBytes), { encoding: "jsonParsed" }]);
+  const value = result && result.value;
+  if (!value) throw new Error("The mint for this asset could not be found through the RPC endpoint.");
+  const ownerB58 = value.owner;
+  let programId;
+  if (ownerB58 === C.b58encode(C.TOKEN_PROGRAM)) programId = C.TOKEN_PROGRAM;
+  else if (ownerB58 === C.b58encode(C.TOKEN2022_PROGRAM)) programId = C.TOKEN2022_PROGRAM;
+  else throw new Error("That mint is not held by a token program this page can pay through.");
+  const info = value.data && value.data.parsed && value.data.parsed.info;
+  if (!info) throw new Error("The mint shape could not be read in parsed form; refusing to guess it.");
+  const extensions = (info.extensions || []).map((e) => e.extension);
+  const feeExt = (info.extensions || []).find((e) => e.extension === "transferFeeConfig");
+  const shape = {
+    programId, decimals: info.decimals, extensions,
+    hasHook: extensions.includes("transferHook"),
+    transferFee: feeExt ? feeExt.state : null,
+  };
+  C.mintGate(shape);  // throws MintError on fee/hook mints — refused here
+  return shape;
+}
+
+// ---- wallet discovery ----------------------------------------------------
+// Wallet-standard wallets register on the window; their signTransaction
+// feature works on serialized transaction bytes, which is what this
+// dependency-free page can hand over exactly.
+const discoveredWallets = [];
+function listenForWallets() {
+  const register = (wallet) => {
+    if (wallet && !discoveredWallets.includes(wallet)) discoveredWallets.push(wallet);
+  };
+  window.addEventListener("wallet-standard:register-wallet", (ev) => {
+    try { ev.detail(register); } catch { /* not a wallet event we can use */ }
+  });
+  window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", {
+    detail: { registerWallet: register },
+  }));
+}
+async function connectWallet() {
+  setStatus("");
+  // Wallet-standard path first.
+  for (const w of discoveredWallets) {
+    const connectFeature = w.features && (w.features["standard:connect"] || w.features["solana:connect"]);
+    const acct = w.accounts && w.accounts[0];
+    if (connectFeature && typeof connectFeature.connect === "function") {
+      const out = await connectFeature.connect();
+      const account = (out && out.accounts && out.accounts[0]) || acct;
+      if (account && account.address) {
+        state.wsWallet = w; state.wsAccount = account;
+        state.payer = C.b58decode(account.address);
+        break;
+      }
+    } else if (acct && acct.address) {
+      state.wsWallet = w; state.wsAccount = acct;
+      state.payer = C.b58decode(acct.address);
+      break;
+    }
+  }
+  // Injected provider fallback for the payer address.
+  if (!state.payer && window.solana && typeof window.solana.connect === "function") {
+    const resp = await window.solana.connect();
+    const pk = resp && resp.publicKey ? resp.publicKey.toString() : window.solana.publicKey.toString();
+    state.payer = C.b58decode(pk);
+  }
+  if (!state.payer) {
+    $("walletState").textContent =
+      "Wallet: none found. This browser has no Solana wallet this page can use, so no payment can be made from here.";
+    $("checkBtn").disabled = true;
+    return;
+  }
+  $("walletState").textContent = "Wallet: connected, payer " + truncKey(state.payer) +
+    " (" + C.b58encode(state.payer) + ")";
+  $("checkBtn").disabled = false;
+}
+
+// ---- the gate: build -> decode-compare -> simulate ------------------------
+async function checkPayment() {
+  invalidatePending();
+  setStatus("Running the checks…");
+  try {
+    if (!state.payer) throw new Error("Connect a wallet first — the payment is built for one specific payer.");
+    const assetIndex = Number($("assetSel").value);
+    const asset = state.cfg.assets[assetIndex];
+    const endpoint = $("rpcIn").value.trim();
+    if (!endpoint) throw new Error("Set an RPC endpoint — the checks need a recent blockhash and a simulation.");
+    const priority = Number($("priorityIn").value || 0);
+    if (!Number.isInteger(priority) || priority < 0)
+      throw new Error("The priority fee must be a whole number of micro-lamports.");
+
+    let mintShape = null, decimals;
+    let ataMissing = new Set();
+    if (asset.tag === C.ASSET_SOL) {
+      decimals = 9;
+    } else {
+      mintShape = state.mintShapes.get(assetIndex);
+      if (!mintShape) {
+        mintShape = await readMintShape(endpoint, asset.mint);
+        state.mintShapes.set(assetIndex, mintShape);
+      }
+      decimals = mintShape.decimals;
+      // Which destination token accounts are missing? (Idempotent creation
+      // for those, and only those, joins the transaction; rent is shown below.)
+      const atas = state.cfg.destinations.map((d) => C.deriveAta(d.pubkey, asset.mint, mintShape.programId));
+      const multi = await rpcCall(endpoint, "getMultipleAccounts",
+        [atas.map((a) => C.b58encode(a)), { encoding: "base64" }]);
+      atas.forEach((ata, i) => {
+        if (!multi.value[i]) ataMissing.add(C.bytesToHex(ata));
+      });
+    }
+
+    const amount = parseDecimalToBase($("amountIn").value, decimals);
+    const bh = await rpcCall(endpoint, "getLatestBlockhash", [{ commitment: "confirmed" }]);
+    const blockhash = C.b58decode(bh.value.blockhash);
+
+    const built = C.buildSplitTx(state.cfg, assetIndex, amount, state.payer,
+      blockhash, ataMissing, mintShape, priority);
+    C.decodeCompare(state.cfg, assetIndex, amount, state.payer, built.message,
+      ataMissing, mintShape, priority);
+    // Simulation runs with the exact balance-delta check: account
+    // states are requested and every post-simulation balance must
+    // differ from its pre-state by exactly the split's amounts
+    // (BANKAI 2026-10-30, LEDGER-2/STORM-03).
+    await C.simulateGate(endpoint, built.tx, undefined, {
+      cfg: state.cfg, assetIndex, amount, payer: state.payer,
+      ataMissing, mintShape, priorityMicrolamports: priority,
+    });
+
+    // Every check passed: show exactly what will move, then offer signing.
+    const rows = $("shareRows");
+    rows.innerHTML = "";
+    state.cfg.destinations.forEach((d, i) => {
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td");
+      td1.textContent = d.label || "No label";
+      const td2 = document.createElement("td");
+      td2.textContent = formatBase(built.shares[i], decimals) + " " + assetName(asset);
+      tr.append(td1, td2);
+      rows.appendChild(tr);
+    });
+    $("rentNote").textContent = ataMissing.size
+      ? `This payment also creates ${ataMissing.size} missing destination token account(s). ` +
+        `The payer pays the rent for each — ${C.ATA_RENT_LAMPORTS_CLASSIC.toLocaleString("en-US")} lamports each — ` +
+        `inside the same transaction, and the simulation above already ran with them included.`
+      : "";
+    $("checkOut").classList.remove("hidden");
+    state.pending = { tx: built.tx, assetIndex, amount };
+    $("signBtn").disabled = false;
+    setStatus("Every check passed: the built transaction matches the verified rule, and the simulation returned no error. Signing is now offered — your wallet will show the transaction before anything is sent.");
+  } catch (e) {
+    setStatus("This payment was refused, and signing is not offered. Reason: " + e.message);
+  }
+}
+
+// ---- signing handoff -------------------------------------------------------
+async function signAndSend() {
+  if (!state.pending) return;
+  $("signBtn").disabled = true;
+  $("sendOut").textContent = "";
+  const endpoint = $("rpcIn").value.trim();
+  try {
+    let signedTx = null;
+    const w = state.wsWallet;
+    const feature = w && w.features && w.features["solana:signTransaction"];
+    if (feature && typeof feature.signTransaction === "function") {
+      const out = await feature.signTransaction({
+        account: state.wsAccount, chain: "solana:mainnet",
+        transaction: state.pending.tx,
+      });
+      const first = Array.isArray(out) ? out[0] : out;
+      signedTx = first.signedTransaction || first;
+    } else if (window.solana && typeof window.solana.signTransaction === "function") {
+      // Some injected providers accept serialized bytes here; most expect
+      // an object from a wallet library this page does not carry. If the
+      // provider refuses, the reason is shown and nothing is sent.
+      signedTx = await window.solana.signTransaction(state.pending.tx);
+      if (signedTx && signedTx.serialize) signedTx = signedTx.serialize();
+    }
+    if (!signedTx) {
+      throw new Error("No wallet here offered the byte-based signing this page uses. Nothing was signed or sent.");
+    }
+    const b64 = C.base64StdEncode(signedTx);
+    const sig = await rpcCall(endpoint, "sendTransaction", [b64, { encoding: "base64" }]);
+    $("sendOut").textContent = "Sent. Transaction signature: " + sig +
+      " — look it up on any Solana explorer to see the split exactly as it landed.";
+    setStatus("Payment sent.");
+  } catch (e) {
+    $("sendOut").textContent = "Signing or sending did not complete. Reason: " + e.message +
+      " Nothing was sent by this page; run the check again before retrying.";
+  } finally {
+    if (state.pending) $("signBtn").disabled = false;
+  }
+}
+
+// ---- boot: read the rule out of the fragment and verify it ----------------
+function boot() {
+  listenForWallets();
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const payload = params.get("c");
+  if (!payload) {
+    failClosed("This link carries no split rule. A TITHE link has the whole signed rule inside it, after the # sign; without it there is nothing here to verify or pay.");
+    return;
+  }
+  let parsed;
+  try {
+    parsed = C.SplitConfig.fromLinkPayload(payload);
+  } catch (e) {
+    failClosed("The split rule in this link did not pass verification on this device (" + e.message + "). The link may have been changed after it was signed, or copied incompletely.");
+    return;
+  }
+  state.cfg = parsed.config;
+  state.signature = parsed.signature;
+  const cfg = state.cfg;
+
+  $("fingerprint").textContent = cfg.fingerprint();
+  $("cfgVersion").textContent = String(cfg.configVersion);
+  // createdAt is a BigInt in the core (RECKONING HAVOC-04); convert
+  // explicitly for the Date.
+  $("cfgCreated").textContent = new Date(Number(cfg.createdAt) * 1000).toUTCString();
+  $("cfgOwner").textContent = truncKey(cfg.owner);
+  // RECKONING (GHOST-01 sub-part): the owner cell gets the same
+  // full-key affordance the destination cells have — the full
+  // base58 address on hover/inspect, so a payer can compare the
+  // whole key, not a 6…6 fragment.
+  $("cfgOwner").title = C.b58encode(cfg.owner);
+
+  const rows = $("destRows");
+  cfg.destinations.forEach((d, i) => {
+    const tr = document.createElement("tr");
+    const tdLabel = document.createElement("td");
+    tdLabel.textContent = d.label || "No label";
+    const tdPct = document.createElement("td");
+    tdPct.textContent = formatPct(d.bps);
+    const tdKey = document.createElement("td");
+    tdKey.className = "mono";
+    tdKey.textContent = truncKey(d.pubkey);
+    tdKey.title = C.b58encode(d.pubkey);
+    const tdNote = document.createElement("td");
+    const notes = [];
+    if (i === cfg.remainderIndex) notes.push("Remainder recipient — receives the rounding remainder");
+    // RECKONING (GHOST-07): the verified byte is part of the
+    // owner-signed rule — the page did not witness any proof.
+    // Attribute the claim to the owner; never state it as a fact
+    // this page checked.
+    notes.push(d.verified
+      ? "The owner states control of this destination was proven by signature"
+      : "The owner has not stated that control of this destination was proven by signature");
+    tdNote.textContent = notes.join(" · ");
+    tr.append(tdLabel, tdPct, tdKey, tdNote);
+    rows.appendChild(tr);
+  });
+
+  const taxDest = cfg.destinations.find((d) => /tax/i.test(d.label));
+  if (taxDest) {
+    $("taxNote").textContent =
+      `One destination here carries the label "${taxDest.label}". A label is only a name: it is not a tax calculation, a filing, or advice.`;
+    $("taxNote").classList.remove("hidden");
+  }
+
+  const sel = $("assetSel");
+  cfg.assets.forEach((a, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = assetName(a);
+    sel.appendChild(opt);
+  });
+  const updateMin = () => {
+    const a = cfg.assets[Number(sel.value)];
+    const dec = a.tag === C.ASSET_SOL ? 9
+      : ((C.bytesEqual(a.mint, C.USDC_MINT) || C.bytesEqual(a.mint, C.SKR_MINT)) ? 6 : null);
+    if (dec === null) {
+      $("minNote").textContent = "The smallest payable amount for this asset is worked out once its mint shape is read during the check.";
+    } else {
+      const min = C.minPaymentAmount(cfg.destinations.map((d) => d.bps), cfg.remainderIndex, a.tag === C.ASSET_SOL);
+      $("minNote").textContent = `Smallest payment this rule can carry in ${assetName(a)}: ${formatBase(min, dec)} ${assetName(a)}. Smaller amounts would leave a destination with dust, so the builder refuses them.`;
+    }
+    invalidatePending();
+  };
+  sel.addEventListener("change", updateMin);
+  updateMin();
+
+  $("configCard").classList.remove("hidden");
+  $("payCard").classList.remove("hidden");
+  $("connectBtn").addEventListener("click", () => connectWallet().catch((e) =>
+    setStatus("Wallet connection did not complete. Reason: " + e.message)));
+  $("checkBtn").addEventListener("click", checkPayment);
+  $("signBtn").addEventListener("click", signAndSend);
+  for (const id of ["amountIn", "rpcIn", "priorityIn"])
+    $(id).addEventListener("input", invalidatePending);
+}
+document.addEventListener("DOMContentLoaded", boot);
+</script>
+</body>
+</html>
