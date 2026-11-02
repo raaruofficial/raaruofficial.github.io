@@ -25,7 +25,7 @@
   <h1>Privacy Policy — Seeker Citadel</h1>
   <p class="sub">Seeker Citadel is published by Raaru. This policy describes
   what the Seeker Citadel service stores, what it never stores, and how long
-  it keeps what it stores. Last updated 2026-10-30.</p>
+  it keeps what it stores. Last updated 2026-11-01.</p>
 
   <p>An independent community forum for Seeker owners. Not endorsed by, affiliated with, or sponsored by Solana or Solana Mobile.</p>
 
@@ -51,6 +51,19 @@
     token. Only a <strong>SHA-256 hash</strong> of the token is stored; the
     token itself is shown to your device once and never stored. Sessions
     expire 7 days after issue and are not renewed silently.</li>
+    <li><strong>Payment records:</strong> joining costs 1,000 SKR, and a
+    commercial post costs 1,000 SKR. To verify a payment, the host records
+    the invoice behind it: your wallet, the amount, the receiving wallet,
+    a one-time reference, and — once paid — the transaction signature and,
+    for a commercial post, the wallet that actually paid (which may be a
+    different wallet from the poster's, if someone paid on their behalf).
+    A payment that arrives late or fails verification is recorded too, as
+    evidence for refunds and disputes. <strong>Payment details are never
+    displayed in the app, never shown on any public surface, and never
+    returned by the service to other users</strong> — they are the house's
+    receipt book, not a member directory. (What is public is the chain
+    itself: a payment to the forum's wallet is visible there like any
+    on-chain transfer.)</li>
     <li><strong>Eligibility proof (internal only):</strong> at sign-in the
     host records the Seeker Genesis Token mint(s) your wallet held, as an
     internal join key (for example, so one device token cannot claim two
@@ -68,10 +81,6 @@
     addresses and member records, not on network identifiers.</li>
     <li>No private keys, seed phrases, or signing material — signing happens
     in your wallet on your device; the host only verifies signatures.</li>
-    <li>Membership payment records. Joining costs 1,000 SKR; the host verifies
-    your payment on chain and keeps its record — your wallet, the amount, and
-    the transaction — as part of your membership. There is no card payment,
-    no checkout, and no held funds.</li>
     <li>No advertising identifiers, analytics beacons, or cross-app tracking.
     The app contains no web view.</li>
   </ul>
@@ -84,9 +93,16 @@
   (<strong>api.mainnet-beta.solana.com</strong>) as an automatic failover.
   The query contains your wallet address — which is public on-chain
   information — and nothing else about you. The host makes no wallet-keyed
-  chain reads outside sign-in (and, in any future paid version, payment
-  verification). What an RPC provider can see is limited to the queries
-  described here; we do not send them your posts, reports, or session data.</p>
+  chain reads outside sign-in and payment verification. Payment
+  verification works differently from sign-in: while an invoice is open,
+  the host repeatedly queries the provider by the invoice's one-time
+  reference and by transaction signature — checking whether your payment
+  has landed is itself the confirmation — and those payment queries fail
+  over to the public endpoint just as sign-in does. The provider does not
+  learn your member record, your posts, or anything about your forum
+  activity from these queries: references are one-time keys with no other
+  life, and the queries come from the host, never from your device. We do
+  not send the provider your posts, reports, or session data.</p>
 
   <h2>5. Retention</h2>
   <ul>
@@ -95,6 +111,13 @@
     <li>Session records are deleted 7 days after the session expires.</li>
     <li>Poll ballots are deleted 7 days after a poll closes; the tallies are
     kept.</li>
+    <li>Payment records are kept as the house's receipts: a paid membership
+    record is kept as part of your membership; a paid commercial invoice
+    record is kept while its post lives. Invoice records for payments that
+    were late or refused are kept as evidence for refunds and disputes.
+    Invoice records that were never paid are an intent record only — they
+    are deleted 7 days after the invoice expires, and they are never used
+    as sales leads.</li>
     <li>Forum content is the permanent record described in §1 and is kept
     unless removed under the moderation rules in the Terms of Use; a removed
     post's declared outbound link, if any, is deleted at removal or within
