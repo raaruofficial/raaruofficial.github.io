@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoloSeekr — Card Vault for Pokémon &amp; One Piece Collectors</title>
+<meta name="description" content="HoloSeekr is a card vault for Solana Seeker: track your physical Pokémon and One Piece cards, see what they actually sold for, and view the tokenized cards in your wallet.">
+<style>
+  :root{--bg:#06060e;--panel:#0e0e1d;--line:#34345e;--txt:#e9e9f8;--dim:#9b9bc6;--gold:#ffb000}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Roboto,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.6}
+  main{max-width:760px;margin:0 auto;padding:48px 24px 64px}
+  h1{font-size:34px;margin:0 0 4px;font-weight:900}
+  .sub{color:var(--dim);margin:0 0 28px}
+  h2{font-size:15px;letter-spacing:3px;color:var(--dim);margin:36px 0 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:0 0 16px}
+  .card p{margin:0 0 10px}
+  .card p:last-child{margin-bottom:0}
+  ul{margin:6px 0 6px 18px;padding:0}
+  li{margin:4px 0}
+  a{color:var(--gold)}
+  footer{color:var(--dim);font-size:13px;margin-top:44px;border-top:1px solid var(--line);padding-top:18px}
+</style>
+</head>
+<body>
+<main>
+  <h1>HoloSeekr</h1>
+  <p class="sub">A card vault for Pokémon &amp; One Piece collectors, built for the Solana Seeker
+  and published through the Solana dApp Store by Raaru.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">WHAT IT DOES</h2>
+    <ul>
+      <li><strong>The Vault</strong> — record the physical cards you own: graded slabs by
+      certificate number, cards picked from the catalog, or a whole collection imported
+      from a CSV export (Collectr, TCGplayer, eBay). What you paid and when is yours to
+      record alongside each card.</li>
+      <li><strong>Real sold prices</strong> — for cards in your vault, HoloSeekr shows what
+      the same card actually sold for recently, drawn from completed eBay sales through a
+      licensed data provider. Every figure carries its source and date. When there are not
+      enough recent sales to stand behind a number, the app says so instead of guessing.</li>
+      <li><strong>The Showcase</strong> — connect your wallet and HoloSeekr reads the public
+      chain to show the tokenized cards it holds, matched against a curated set of
+      recognized collections. Your wallet signs the connection; your keys never leave
+      your wallet app.</li>
+      <li><strong>The Value view</strong> — one total for what your collection is worth,
+      with an honest coverage line showing how many of your cards have a current
+      valuation behind them.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">HONEST SCOPE — v0.1</h2>
+    <p>HoloSeekr is <strong>free</strong>. There is nothing to buy in the app and no
+    payment surface of any kind.</p>
+    <p>Pokémon catalog coverage is the launch strength. One Piece support is in early
+    rollout — vault entries work, but catalog and price coverage for One Piece cards is
+    still limited and growing.</p>
+    <p>The Showcase recognizes a curated set of tokenized-card collections, and that set
+    grows through publisher partnerships. A wallet holding only collections outside the
+    recognized set will show an empty Showcase — that is the honest answer, not an error.</p>
+    <p>HoloSeekr is not a marketplace: it never takes custody of cards or money, and it
+    does not grade cards or certify authenticity. Prices are records of past sales,
+    not a promise of what a card will sell for.</p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">PRIVACY</h2>
+    <p>HoloSeekr has no ads, no analytics trackers, and no third-party data SDKs. We do
+    not sell user data — there is no data business behind this app.</p>
+    <p>To work, the app talks to the HoloSeekr service, and the service receives and
+    stores: the vault entries you create (card, grade, certificate number, and any
+    notes or purchase details you record), the CSV files you choose to import, your
+    catalog and price searches, and — only when you run a Showcase scan — your
+    wallet's public address, which the service uses to look up that wallet's public
+    on-chain assets. On-chain data is public by nature; your vault entries are not
+    published anywhere.</p>
+    <p>Wallet connection uses the standard Mobile Wallet Adapter protocol. Approvals
+    happen in your wallet app; HoloSeekr never sees or stores private keys or seed
+    phrases, and it cannot move anything in your wallet.</p>
+    <p>To have your stored vault data deleted, email
+    <a href="mailto:raaruofficial+support@gmail.com">raaruofficial+support@gmail.com</a>
+    and we will remove it.</p>
+  </div>
+
+  <h2>SUPPORT</h2>
+  <p>Questions about HoloSeekr: <a href="mailto:raaruofficial+support@gmail.com">raaruofficial+support@gmail.com</a>
+  — we acknowledge within 48 hours.</p>
+  <p>Publisher: <a href="https://raaruofficial.github.io/">Raaru</a> ·
+  <a href="https://x.com/raaruofficial">@raaruofficial on X</a> ·
+  <a href="https://github.com/raaruofficial">raaruofficial on GitHub</a></p>
+
+  <footer>© 2026 Raaru. All rights reserved.</footer>
+</main>
+</body>
+</html>
